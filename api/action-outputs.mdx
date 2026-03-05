@@ -1,0 +1,209 @@
+---
+title: Action Outputs
+description: Complete reference for GitHub Star Tracker action outputs
+---
+
+## Available Outputs
+
+All outputs are available for use in subsequent workflow steps via `${{ steps.<step-id>.outputs.<output-name> }}`.
+
+### Report Outputs
+
+<ResponseField name="report" type="string">
+  Markdown report of star changes.
+  
+  Contains a comprehensive overview of star count changes across all tracked repositories, including:
+  - Total star count and change
+  - Repository-level details with deltas
+  - Historical trend charts (if enabled)
+  - New stargazers (if tracking enabled)
+  - Star forecasts for top repositories
+  
+  **Example usage:**
+  ```yaml
+  - name: Track stars
+    id: track
+    uses: ferranbuireu/github-star-tracker@v1
+    with:
+      github-token: ${{ secrets.PAT_TOKEN }}
+  
+  - name: Post to Slack
+    uses: slackapi/slack-github-action@v1
+    with:
+      payload: |
+        {
+          "text": ${{ toJSON(steps.track.outputs.report) }}
+        }
+  ```
+</ResponseField>
+
+<ResponseField name="report-html" type="string">
+  HTML report of star changes.
+  
+  Formatted version of the markdown report suitable for email notifications or web display. Contains the same information as the markdown report but with HTML styling.
+  
+  Automatically sent via email when SMTP configuration is provided.
+</ResponseField>
+
+<ResponseField name="report-csv" type="string">
+  CSV report of star changes.
+  
+  Contains repository-level data in CSV format with the following columns:
+  - `repository` - Full repository name (owner/name)
+  - `current_stars` - Current star count
+  - `previous_stars` - Previous star count (or N/A for new repos)
+  - `change` - Star count delta
+  - `status` - Repository status (new, removed, or empty)
+  
+  **Example output:**
+  ```csv
+  repository,current_stars,previous_stars,change,status
+  ferranbuireu/github-star-tracker,245,238,+7,
+  myorg/my-repo,42,N/A,+42,new
+  ```
+</ResponseField>
+
+### Statistics Outputs
+
+<ResponseField name="total-stars" type="string">
+  Total star count across all tracked repositories.
+  
+  **Example:**
+  ```yaml
+  - name: Create badge
+    run: |
+      echo "Total Stars: ${{ steps.track.outputs.total-stars }}"
+  ```
+</ResponseField>
+
+<ResponseField name="stars-changed" type="string">
+  Whether any star counts changed since last run.
+  
+  **Values:**
+  - `true` - Star counts have changed
+  - `false` - No changes detected
+  
+  **Example usage:**
+  ```yaml
+  - name: Conditional notification
+    if: steps.track.outputs.stars-changed == 'true'
+    run: echo "Stars changed!"
+  ```
+</ResponseField>
+
+<ResponseField name="new-stars" type="string">
+  Number of new stars gained since last run.
+  
+  Represents the total positive change across all repositories.
+  
+  **Example:**
+  ```yaml
+  - name: Celebrate growth
+    if: steps.track.outputs.new-stars > 0
+    run: echo "Gained ${{ steps.track.outputs.new-stars }} stars!"
+  ```
+</ResponseField>
+
+<ResponseField name="lost-stars" type="string">
+  Number of stars lost since last run.
+  
+  Represents the total negative change across all repositories (as a positive number).
+  
+  **Example output:** `3` (means 3 stars were lost)
+</ResponseField>
+
+### Notification Outputs
+
+<ResponseField name="should-notify" type="string">
+  Whether the notification threshold was reached.
+  
+  **Values:**
+  - `true` - Threshold reached; notification should be sent
+  - `false` - Threshold not reached; skip notification
+  
+  Determined by comparing total star change against the `notification-threshold` input. When threshold is `0`, this is always `true` if stars changed.
+  
+  **Example usage:**
+  ```yaml
+  - name: Send Discord notification
+    if: steps.track.outputs.should-notify == 'true'
+    uses: sarisia/actions-status-discord@v1
+    with:
+      webhook: ${{ secrets.DISCORD_WEBHOOK }}
+      content: ${{ steps.track.outputs.report }}
+  ```
+</ResponseField>
+
+### Stargazer Outputs
+
+<ResponseField name="new-stargazers" type="string">
+  Number of new stargazers detected since last run.
+  
+  **Value:** `0` if stargazer tracking is disabled (default).
+  
+  When `track-stargazers` is enabled, this represents the total count of new unique users who starred any tracked repository.
+  
+  **Example:**
+  ```yaml
+  - name: Thank new stargazers
+    if: steps.track.outputs.new-stargazers > 0
+    run: |
+      echo "Welcome ${{ steps.track.outputs.new-stargazers }} new stargazers!"
+  ```
+</ResponseField>
+
+## Output Examples
+
+### Complete Output Set
+
+```yaml
+report: |
+  # GitHub Star Tracker Report
+  
+  Total: **1,234 stars** (+15)
+  
+  ## Repository Changes
+  
+  | Repository | Stars | Change |
+  |------------|-------|--------|
+  | owner/repo1 | 456 | +10 |
+  | owner/repo2 | 778 | +5 |
+  
+report-html: "<html>...</html>"
+report-csv: "repository,current_stars,previous_stars,change,status\nowner/repo1,456,446,+10,\n"
+total-stars: "1234"
+stars-changed: "true"
+new-stars: "15"
+lost-stars: "0"
+should-notify: "true"
+new-stargazers: "8"
+```
+
+### Using Outputs in Workflows
+
+```yaml
+- name: Track GitHub Stars
+  id: tracker
+  uses: ferranbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.PAT_TOKEN }}
+
+- name: Create GitHub Issue on milestone
+  if: steps.tracker.outputs.total-stars >= 1000
+  uses: actions/github-script@v7
+  with:
+    script: |
+      await github.rest.issues.create({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        title: '🎉 Reached 1,000 stars!',
+        body: `## Milestone Achieved!\n\nWe now have ${context.payload.steps.tracker.outputs['total-stars']} total stars across our repositories.\n\n${context.payload.steps.tracker.outputs.report}`
+      });
+
+- name: Upload CSV report
+  uses: actions/upload-artifact@v4
+  with:
+    name: star-report
+    path: |
+      echo "${{ steps.tracker.outputs.report-csv }}" > report.csv
+```

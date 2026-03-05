@@ -1,0 +1,227 @@
+---
+title: "Stargazer Tracking"
+description: "Track individual users who star your repositories and identify new stargazers"
+---
+
+## Overview
+
+Stargazer tracking identifies individual users who have starred your repositories, tracking when they starred and detecting new stargazers between snapshots.
+
+## Data Structure
+
+Stargazer information is defined in `src/domain/stargazers.ts:1`:
+
+```typescript
+interface Stargazer {
+  login: string;        // GitHub username
+  avatarUrl: string;    // Profile avatar URL
+  profileUrl: string;   // GitHub profile URL
+  starredAt: string;    // ISO 8601 timestamp
+}
+
+interface RepoStargazers {
+  repoFullName: string;
+  stargazers: Stargazer[];
+}
+```
+
+## Detecting New Stargazers
+
+The `diffStargazers` function identifies new stargazers by comparing current data against a previous snapshot:
+
+```typescript
+import { diffStargazers } from '@domain/stargazers';
+
+const result = diffStargazers({
+  current: currentStargazers,
+  previousMap: previousStargazerMap
+});
+
+console.log(result);
+// {
+//   entries: [
+//     {
+//       repoFullName: 'owner/repo',
+//       newStargazers: [/* Stargazer objects */]
+//     }
+//   ],
+//   totalNew: 5
+// }
+```
+
+### Implementation Details
+
+The function performs these steps (see `src/domain/stargazers.ts:30`):
+
+1. Creates a `Set` of previous stargazer logins for each repo
+2. Filters current stargazers to find those not in the previous set
+3. Sorts new stargazers by `starredAt` timestamp (most recent first)
+4. Counts total new stargazers across all repositories
+
+```typescript
+const previousLogins = new Set(previousMap[repo.repoFullName] ?? []);
+const newStargazers = repo.stargazers
+  .filter((s) => !previousLogins.has(s.login))
+  .sort((a, b) => b.starredAt.localeCompare(a.starredAt));
+```
+
+## Building Stargazer Maps
+
+Stargazer maps provide efficient lookup for comparison:
+
+```typescript
+import { buildStargazerMap } from '@domain/stargazers';
+
+const stargazerMap = buildStargazerMap(repoStargazers);
+
+console.log(stargazerMap);
+// {
+//   'owner/repo1': ['user1', 'user2', 'user3'],
+//   'owner/repo2': ['user4', 'user5']
+// }
+```
+
+### Type Definition
+
+```typescript
+type StargazerMap = Record<string, string[]>;
+```
+
+The map stores only usernames for efficient comparison, reducing memory usage.
+
+## Display in Reports
+
+Stargazer information is included in generated reports with avatar images and profile links.
+
+### Markdown Format
+
+```markdown
+## 👤 New Stargazers
+
+5 new stargazers since last update
+
+<details>
+<summary>owner/repo (3 stargazers)</summary>
+
+- <img src="https://avatars.githubusercontent.com/u/123" width="20" height="20" style="border-radius:50%;vertical-align:middle;"> [user1](https://github.com/user1): Starred on 2024-01-15
+- <img src="https://avatars.githubusercontent.com/u/456" width="20" height="20" style="border-radius:50%;vertical-align:middle;"> [user2](https://github.com/user2): Starred on 2024-01-14
+
+</details>
+```
+
+### HTML Format
+
+HTML reports display stargazers with styled avatars (see `src/presentation/html.ts:116`):
+
+```html
+<div style="display:flex;align-items:center;margin:4px 0;">
+  <img src="https://avatars.githubusercontent.com/u/123" width="32" height="32" style="border-radius:50%;margin-right:8px;">
+  <a href="https://github.com/user1" style="color:#0366d6;text-decoration:none;font-weight:600;">user1</a>
+  <span style="color:#6a737d;margin-left:8px;font-size:12px;">Starred on 2024-01-15</span>
+</div>
+```
+
+## Diff Result Structure
+
+```typescript
+interface StargazerDiffEntry {
+  repoFullName: string;
+  newStargazers: Stargazer[];
+}
+
+interface StargazerDiffResult {
+  entries: StargazerDiffEntry[];  // Per-repository new stargazers
+  totalNew: number;                // Total count across all repos
+}
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Engagement Tracking" icon="users">
+    Monitor who is discovering and starring your projects
+  </Card>
+  <Card title="Community Growth" icon="chart-line">
+    Track the rate of new stargazers over time
+  </Card>
+  <Card title="Outreach" icon="envelope">
+    Identify new stargazers for potential engagement or thank-you messages
+  </Card>
+  <Card title="Analytics" icon="chart-bar">
+    Analyze stargazer patterns and growth trends
+  </Card>
+</CardGroup>
+
+## Data Collection
+
+<Note>
+Stargazer data must be collected from the GitHub API separately. The tracking functions expect data to be provided in the documented format.
+</Note>
+
+### GitHub API Integration
+
+Stargazer data can be fetched from the GitHub API:
+
+```bash
+GET /repos/{owner}/{repo}/stargazers
+```
+
+With the `Accept: application/vnd.github.v3.star+json` header to include `starred_at` timestamps.
+
+## Privacy Considerations
+
+<Warning>
+Stargazer information is public data available through the GitHub API. However, respect user privacy:
+
+- Only track public star events
+- Avoid storing unnecessary personal information
+- Follow GitHub's API rate limits and terms of service
+</Warning>
+
+## Performance
+
+The diff algorithm is optimized for performance:
+
+- **Time complexity**: O(n) where n is the number of stargazers
+- **Space complexity**: O(m) where m is the number of previous stargazers
+- Uses `Set` for O(1) lookup time when checking previous stargazers
+
+## Best Practices
+
+1. **Store Snapshots**: Keep historical stargazer maps to track changes over time
+2. **Sort Results**: New stargazers are automatically sorted by date (most recent first)
+3. **Handle Unstarring**: Users who unstar won't appear in new stargazers but won't be in current data
+4. **Empty Previous Maps**: Pass an empty map `{}` for first-time tracking
+
+## Example Workflow
+
+```typescript
+import { diffStargazers, buildStargazerMap } from '@domain/stargazers';
+
+// First snapshot
+const snapshot1 = fetchStargazers();
+const map1 = buildStargazerMap(snapshot1);
+
+// Later snapshot
+const snapshot2 = fetchStargazers();
+const diff = diffStargazers({
+  current: snapshot2,
+  previousMap: map1
+});
+
+if (diff.totalNew > 0) {
+  console.log(`${diff.totalNew} new stargazers!`);
+  diff.entries.forEach(entry => {
+    console.log(`${entry.repoFullName}: ${entry.newStargazers.length} new`);
+  });
+}
+
+// Save for next comparison
+const map2 = buildStargazerMap(snapshot2);
+```
+
+## Related
+
+- [Reports](/features/reports) - Display stargazer data in reports
+- [Charts](/features/charts) - Visualize star growth over time
+- [API Reference](/architecture) - Complete domain function reference

@@ -1,0 +1,379 @@
+---
+title: Workflow Setup
+description: Complete guide to setting up GitHub Star Tracker workflows with scheduling and configuration
+---
+
+This guide walks you through creating and configuring a GitHub Actions workflow for Star Tracker, from basic setup to advanced configurations.
+
+## Basic Workflow Setup
+
+<Steps>
+  <Step title="Create Workflow Directory">
+    In your repository, create the `.github/workflows` directory if it doesn't exist:
+
+    ```bash
+    mkdir -p .github/workflows
+    ```
+  </Step>
+
+  <Step title="Create Workflow File">
+    Create a new file `.github/workflows/star-tracker.yml`:
+
+    ```yaml
+    name: Track Stars
+
+    on:
+      schedule:
+        - cron: '0 0 * * *'  # Daily at midnight UTC
+      workflow_dispatch:      # Allow manual triggering
+
+    permissions:
+      contents: write
+
+    jobs:
+      track:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: fbuireu/github-star-tracker@v1
+            with:
+              github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    ```
+  </Step>
+
+  <Step title="Commit and Push">
+    Commit the workflow file and push to your repository:
+
+    ```bash
+    git add .github/workflows/star-tracker.yml
+    git commit -m "Add star tracker workflow"
+    git push
+    ```
+  </Step>
+
+  <Step title="Trigger First Run">
+    Go to **Actions** tab in your repository, select **Track Stars**, and click **Run workflow** to trigger the first run manually.
+  </Step>
+</Steps>
+
+## Schedule Configuration
+
+The `cron` syntax controls when your workflow runs automatically.
+
+### Common Schedules
+
+```yaml
+# Daily at midnight UTC
+schedule:
+  - cron: '0 0 * * *'
+
+# Every Monday at 9 AM UTC
+schedule:
+  - cron: '0 9 * * 1'
+
+# Every 6 hours
+schedule:
+  - cron: '0 */6 * * *'
+
+# Weekly on Sunday at 8 PM UTC
+schedule:
+  - cron: '0 20 * * 0'
+
+# First day of every month at midnight
+schedule:
+  - cron: '0 0 1 * *'
+```
+
+### Cron Syntax Reference
+
+```
+┌───────────── minute (0 - 59)
+│ ┌───────────── hour (0 - 23)
+│ │ ┌───────────── day of month (1 - 31)
+│ │ │ ┌───────────── month (1 - 12)
+│ │ │ │ ┌───────────── day of week (0 - 6) (Sunday to Saturday)
+│ │ │ │ │
+* * * * *
+```
+
+<Warning>
+  GitHub Actions schedules may experience delays during high usage periods. Scheduled workflows are not guaranteed to run at the exact specified time.
+</Warning>
+
+## Trigger Options
+
+### Multiple Triggers
+
+Combine multiple trigger types for flexibility:
+
+```yaml
+on:
+  schedule:
+    - cron: '0 0 * * *'     # Scheduled daily
+  workflow_dispatch:         # Manual trigger
+  push:
+    branches:
+      - main                 # On push to main
+```
+
+### Manual Trigger with Inputs
+
+Add input parameters for manual runs:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      visibility:
+        description: 'Repository visibility filter'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - public
+          - private
+          - owned
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          visibility: ${{ inputs.visibility || 'all' }}
+```
+
+## Configuration Options
+
+### Repository Filtering
+
+Control which repositories to track:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    visibility: 'public'        # public | private | all | owned
+    include-archived: false     # Include archived repos
+    include-forks: false        # Include forked repos
+    min-stars: '5'              # Only track repos with 5+ stars
+    exclude-repos: 'test-repo,/^demo-.*/'  # Exclude by name or regex
+    only-repos: 'important-repo,main-project'  # Track only these repos
+```
+
+### Data Management
+
+Configure how data is stored:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    data-branch: 'star-tracker-data'  # Branch for storing data
+    max-history: '52'                  # Keep 52 snapshots (1 year of weekly data)
+```
+
+### Localization
+
+Set report language:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    locale: 'es'  # en | es | ca | it
+```
+
+### Charts and Visualization
+
+Control chart generation:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    include-charts: true   # Generate SVG charts
+    top-repos: '10'        # Number of top repos in charts
+```
+
+### Stargazer Tracking
+
+Track individual stargazers:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    track-stargazers: true  # Track who stars your repos
+```
+
+<Note>
+  Stargazer tracking requires additional API calls and may increase workflow execution time.
+</Note>
+
+## Using Configuration Files
+
+For complex configurations, use a YAML configuration file:
+
+<Steps>
+  <Step title="Create Configuration File">
+    Create `star-tracker.yml` in your repository root:
+
+    ```yaml
+    visibility: public
+    include_archived: false
+    include_forks: false
+    exclude_repos:
+      - test-repo
+      - /^demo-.*/
+    min_stars: 5
+    data_branch: star-tracker-data
+    max_history: 52
+    include_charts: true
+    locale: en
+    notification_threshold: auto
+    track_stargazers: false
+    top_repos: 10
+    ```
+  </Step>
+
+  <Step title="Reference in Workflow">
+    The configuration file is loaded automatically, or specify a custom path:
+
+    ```yaml
+    - uses: fbuireu/github-star-tracker@v1
+      with:
+        github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+        config-path: 'star-tracker.yml'
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  Workflow inputs override configuration file values, which override defaults.
+</Info>
+
+## Complete Example
+
+Here's a fully configured workflow with all common options:
+
+```yaml
+name: Track Repository Stars
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track-stars:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Track star counts
+        uses: fbuireu/github-star-tracker@v1
+        with:
+          # Authentication
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          
+          # Repository filtering
+          visibility: 'public'
+          include-archived: false
+          include-forks: false
+          min-stars: '5'
+          exclude-repos: 'test-repo,/^demo-.*/'
+          
+          # Data management
+          data-branch: 'star-tracker-data'
+          max-history: '52'
+          
+          # Visualization
+          include-charts: true
+          top-repos: '10'
+          locale: 'en'
+          
+          # Tracking
+          track-stargazers: true
+          
+      - name: Display summary
+        run: |
+          echo "Total stars: ${{ steps.track.outputs.total-stars }}"
+          echo "New stars: ${{ steps.track.outputs.new-stars }}"
+          echo "Lost stars: ${{ steps.track.outputs.lost-stars }}"
+```
+
+## Using Action Outputs
+
+Star Tracker provides outputs that can be used in subsequent steps:
+
+```yaml
+- name: Track stars
+  id: tracker
+  uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+- name: Check star changes
+  if: steps.tracker.outputs.stars-changed == 'true'
+  run: |
+    echo "Stars changed!"
+    echo "New: ${{ steps.tracker.outputs.new-stars }}"
+    echo "Lost: ${{ steps.tracker.outputs.lost-stars }}"
+    echo "Total: ${{ steps.tracker.outputs.total-stars }}"
+
+- name: Post to Slack
+  if: steps.tracker.outputs.should-notify == 'true'
+  uses: slackapi/slack-github-action@v1
+  with:
+    payload: |
+      {
+        "text": "Star update: +${{ steps.tracker.outputs.new-stars }} stars!"
+      }
+  env:
+    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+## Permissions
+
+The workflow requires the following permissions:
+
+```yaml
+permissions:
+  contents: write  # Required to push to data branch
+```
+
+<Warning>
+  Without `contents: write` permission, the workflow cannot commit data to the data branch.
+</Warning>
+
+## Troubleshooting
+
+### Workflow Not Running on Schedule
+
+- Verify the cron syntax is correct
+- Check that workflows are enabled in repository settings
+- Scheduled workflows in forks don't run automatically
+- GitHub may delay scheduled workflows during high usage
+
+### Permission Denied Errors
+
+- Verify `permissions: contents: write` is set in the workflow
+- Check that the Personal Access Token has the required scopes
+- Ensure the token hasn't expired
+
+### Data Branch Not Created
+
+- Verify the workflow has run at least once
+- Check workflow logs for errors
+- Ensure `contents: write` permission is set
+
+## Related Resources
+
+- [Personal Access Token Setup](/guides/personal-access-token)
+- [Email Notifications](/guides/email-notifications)
+- [Data Management](/guides/data-management)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)

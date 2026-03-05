@@ -1,0 +1,354 @@
+---
+title: Data Formats
+description: JSON schemas and data structures used by GitHub Star Tracker
+---
+
+## Overview
+
+GitHub Star Tracker stores historical data in JSON format on the `data-branch`. Understanding these formats is useful for:
+- Building custom integrations
+- Analyzing historical trends
+- Creating custom reports
+- Debugging issues
+
+## Core Data Types
+
+### RepoInfo
+
+Represents a repository with its metadata.
+
+```typescript
+interface RepoInfo {
+  owner: string;        // Repository owner username or org name
+  name: string;         // Repository name
+  fullName: string;     // Full name in "owner/name" format
+  private: boolean;     // Whether repository is private
+  archived: boolean;    // Whether repository is archived
+  fork: boolean;        // Whether repository is a fork
+  stars: number;        // Current star count
+}
+```
+
+**Example:**
+```json
+{
+  "owner": "ferranbuireu",
+  "name": "github-star-tracker",
+  "fullName": "ferranbuireu/github-star-tracker",
+  "private": false,
+  "archived": false,
+  "fork": false,
+  "stars": 245
+}
+```
+
+### SnapshotRepo
+
+Simplified repository data stored in historical snapshots.
+
+```typescript
+interface SnapshotRepo {
+  fullName: string;     // Full repository name (owner/name)
+  name: string;         // Repository name
+  owner: string;        // Repository owner
+  stars: number;        // Star count at snapshot time
+}
+```
+
+**Example:**
+```json
+{
+  "fullName": "ferranbuireu/github-star-tracker",
+  "name": "github-star-tracker",
+  "owner": "ferranbuireu",
+  "stars": 245
+}
+```
+
+### Snapshot
+
+A point-in-time record of star counts across all tracked repositories.
+
+```typescript
+interface Snapshot {
+  timestamp: string;    // ISO 8601 timestamp
+  totalStars: number;   // Sum of stars across all repos
+  repos: SnapshotRepo[]; // Array of repository snapshots
+}
+```
+
+**Example:**
+```json
+{
+  "timestamp": "2026-03-05T10:30:00.000Z",
+  "totalStars": 1234,
+  "repos": [
+    {
+      "fullName": "ferranbuireu/github-star-tracker",
+      "name": "github-star-tracker",
+      "owner": "ferranbuireu",
+      "stars": 245
+    },
+    {
+      "fullName": "myorg/my-repo",
+      "name": "my-repo",
+      "owner": "myorg",
+      "stars": 989
+    }
+  ]
+}
+```
+
+### History
+
+Complete historical record of snapshots with notification tracking.
+
+```typescript
+interface History {
+  snapshots: Snapshot[];          // Array of historical snapshots
+  starsAtLastNotification?: number; // Total stars when last notification sent
+}
+```
+
+**Example:**
+```json
+{
+  "snapshots": [
+    {
+      "timestamp": "2026-02-26T10:30:00.000Z",
+      "totalStars": 1219,
+      "repos": [
+        {
+          "fullName": "ferranbuireu/github-star-tracker",
+          "name": "github-star-tracker",
+          "owner": "ferranbuireu",
+          "stars": 238
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-03-05T10:30:00.000Z",
+      "totalStars": 1234,
+      "repos": [
+        {
+          "fullName": "ferranbuireu/github-star-tracker",
+          "name": "github-star-tracker",
+          "owner": "ferranbuireu",
+          "stars": 245
+        }
+      ]
+    }
+  ],
+  "starsAtLastNotification": 1200
+}
+```
+
+**Storage location:** `.data/history.json` on the data branch
+
+## Comparison Data Types
+
+### RepoResult
+
+Comparison result for a single repository between current and previous snapshot.
+
+```typescript
+interface RepoResult {
+  name: string;           // Repository name
+  fullName: string;       // Full repository name (owner/name)
+  owner: string;          // Repository owner
+  current: number;        // Current star count
+  previous: number | null; // Previous star count (null for new repos)
+  delta: number;          // Change in stars (current - previous)
+  isNew: boolean;         // Whether this is a newly tracked repo
+  isRemoved: boolean;     // Whether repo was removed from tracking
+}
+```
+
+**Example:**
+```json
+{
+  "name": "github-star-tracker",
+  "fullName": "ferranbuireu/github-star-tracker",
+  "owner": "ferranbuireu",
+  "current": 245,
+  "previous": 238,
+  "delta": 7,
+  "isNew": false,
+  "isRemoved": false
+}
+```
+
+### Summary
+
+Aggregate statistics across all repositories.
+
+```typescript
+interface Summary {
+  totalStars: number;     // Total current stars across all repos
+  totalPrevious: number;  // Total previous stars
+  totalDelta: number;     // Net change in stars
+  newStars: number;       // Stars gained
+  lostStars: number;      // Stars lost
+  changed: boolean;       // Whether any changes occurred
+}
+```
+
+**Example:**
+```json
+{
+  "totalStars": 1234,
+  "totalPrevious": 1219,
+  "totalDelta": 15,
+  "newStars": 18,
+  "lostStars": 3,
+  "changed": true
+}
+```
+
+### ComparisonResults
+
+Complete comparison results between two snapshots.
+
+```typescript
+interface ComparisonResults {
+  repos: RepoResult[];    // Per-repository comparison results
+  summary: Summary;       // Aggregate summary statistics
+}
+```
+
+**Example:**
+```json
+{
+  "repos": [
+    {
+      "name": "github-star-tracker",
+      "fullName": "ferranbuireu/github-star-tracker",
+      "owner": "ferranbuireu",
+      "current": 245,
+      "previous": 238,
+      "delta": 7,
+      "isNew": false,
+      "isRemoved": false
+    },
+    {
+      "name": "my-repo",
+      "fullName": "myorg/my-repo",
+      "owner": "myorg",
+      "current": 989,
+      "previous": 981,
+      "delta": 8,
+      "isNew": false,
+      "isRemoved": false
+    }
+  ],
+  "summary": {
+    "totalStars": 1234,
+    "totalPrevious": 1219,
+    "totalDelta": 15,
+    "newStars": 18,
+    "lostStars": 3,
+    "changed": true
+  }
+}
+```
+
+## Data Branch Structure
+
+The data branch contains the following files:
+
+```
+.data/
+├── history.json          # Historical snapshots (History format)
+├── stargazers.json       # Stargazer tracking data (if enabled)
+├── report.md             # Latest markdown report
+├── report.csv            # Latest CSV report
+├── badge.svg             # Total stars badge
+└── charts/
+    ├── star-history.svg  # Overall star trend chart
+    ├── comparison.svg    # Top repositories comparison
+    ├── forecast.svg      # Star count forecast
+    └── {owner}-{repo}.svg # Per-repository charts
+```
+
+## Reading Historical Data
+
+You can access the data branch to read historical snapshots:
+
+```bash
+# Clone the data branch
+git clone -b star-tracker-data --single-branch https://github.com/owner/repo.git
+
+# Read history
+cat .data/history.json | jq '.snapshots[-1]'  # Latest snapshot
+cat .data/history.json | jq '.snapshots | length'  # Number of snapshots
+```
+
+## Using Data in Scripts
+
+### Python Example
+
+```python
+import json
+import requests
+
+# Fetch history from data branch
+url = "https://raw.githubusercontent.com/owner/repo/star-tracker-data/.data/history.json"
+response = requests.get(url)
+history = response.json()
+
+# Analyze trends
+snapshots = history['snapshots']
+for snapshot in snapshots[-5:]:  # Last 5 snapshots
+    print(f"{snapshot['timestamp']}: {snapshot['totalStars']} stars")
+
+# Calculate growth rate
+if len(snapshots) >= 2:
+    latest = snapshots[-1]['totalStars']
+    previous = snapshots[-2]['totalStars']
+    growth = ((latest - previous) / previous) * 100
+    print(f"Growth rate: {growth:.2f}%")
+```
+
+### JavaScript Example
+
+```javascript
+const fs = require('fs');
+
+// Read local history file
+const history = JSON.parse(fs.readFileSync('.data/history.json', 'utf8'));
+
+// Find repository with most growth
+const latestSnapshot = history.snapshots[history.snapshots.length - 1];
+const previousSnapshot = history.snapshots[history.snapshots.length - 2];
+
+const growth = latestSnapshot.repos.map(current => {
+  const previous = previousSnapshot.repos.find(r => r.fullName === current.fullName);
+  return {
+    repo: current.fullName,
+    stars: current.stars,
+    delta: previous ? current.stars - previous.stars : current.stars
+  };
+}).sort((a, b) => b.delta - a.delta);
+
+console.log('Top growing repository:', growth[0]);
+```
+
+## Schema Validation
+
+For TypeScript projects, you can import the types directly:
+
+```typescript
+import type { 
+  History, 
+  Snapshot, 
+  ComparisonResults,
+  RepoResult,
+  Summary 
+} from '@domain/types';
+
+// Type-safe data handling
+function analyzeHistory(history: History): void {
+  const latest = history.snapshots[history.snapshots.length - 1];
+  console.log(`Latest snapshot: ${latest.totalStars} stars`);
+}
+```

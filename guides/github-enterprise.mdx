@@ -1,0 +1,439 @@
+---
+title: GitHub Enterprise Server Support
+description: Configure Star Tracker for GitHub Enterprise Server installations with custom API endpoints
+---
+
+GitHub Star Tracker supports GitHub Enterprise Server (GHES) installations, allowing you to track stars for repositories hosted on your organization's private GitHub instance.
+
+## Overview
+
+GitHub Enterprise Server support enables:
+
+- Tracking repositories on self-hosted GHES instances
+- Automatic API URL detection on GHES runners
+- Manual API endpoint configuration
+- All standard Star Tracker features on GHES
+
+## Automatic Configuration
+
+When running on GitHub Enterprise Server runners, the API URL is automatically detected.
+
+### Using GHES Runners
+
+```yaml
+name: Track Stars
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: [self-hosted, enterprise]  # GHES runner
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          # API URL automatically detected from GITHUB_API_URL environment variable
+```
+
+<Info>
+  On GHES runners, the `GITHUB_API_URL` environment variable is automatically set by GitHub Enterprise.
+</Info>
+
+## Manual Configuration
+
+For runners that don't auto-detect the API URL, specify it manually.
+
+### Setting API URL Explicitly
+
+From the action.yml specification (action.yml:14-17):
+
+```yaml
+github-api-url:
+  description: 'GitHub API base URL for GitHub Enterprise Server (e.g. https://github.example.com/api/v3). Auto-detected on GHES runners.'
+  required: false
+  default: ''
+```
+
+### Workflow Configuration
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    github-api-url: 'https://github.example.com/api/v3'
+```
+
+<Steps>
+  <Step title="Identify Your GHES API URL">
+    Your GitHub Enterprise Server API URL follows this format:
+    ```
+    https://[your-ghes-hostname]/api/v3
+    ```
+    
+    For example:
+    - `https://github.company.com/api/v3`
+    - `https://git.enterprise.org/api/v3`
+  </Step>
+
+  <Step title="Add API URL to Workflow">
+    Update your workflow file:
+    ```yaml
+    - uses: fbuireu/github-star-tracker@v1
+      with:
+        github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+        github-api-url: 'https://github.company.com/api/v3'
+    ```
+  </Step>
+
+  <Step title="Test the Configuration">
+    Run the workflow manually to verify the API URL is correct and accessible.
+  </Step>
+</Steps>
+
+## Personal Access Token for GHES
+
+Create a PAT on your GitHub Enterprise Server instance:
+
+<Steps>
+  <Step title="Navigate to GHES Token Settings">
+    Go to your GHES instance:
+    ```
+    https://[your-ghes-hostname]/settings/tokens
+    ```
+  </Step>
+
+  <Step title="Generate New Token">
+    - Click **Generate new token** > **Generate new token (classic)**
+    - **Note**: Enter a descriptive name like `Star Tracker`
+    - **Expiration**: Set your preferred expiration
+  </Step>
+
+  <Step title="Select Scopes">
+    Choose the appropriate scope:
+    - `repo` - Full control (required for private repos)
+    - `public_repo` - Public repos only
+  </Step>
+
+  <Step title="Generate and Save">
+    - Click **Generate token**
+    - Copy the token immediately
+    - Store as repository secret `GITHUB_STAR_TRACKER_TOKEN`
+  </Step>
+</Steps>
+
+<Note>
+  PAT requirements are the same for GHES as for GitHub.com. See the [Personal Access Token guide](/guides/personal-access-token) for detailed instructions.
+</Note>
+
+## Complete GHES Workflow Example
+
+Full workflow configuration for GitHub Enterprise Server:
+
+```yaml
+name: Track Stars (GitHub Enterprise)
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: [self-hosted, enterprise]  # GHES runner
+    
+    steps:
+      - name: Track repository stars
+        uses: fbuireu/github-star-tracker@v1
+        with:
+          # Authentication
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          
+          # GHES Configuration
+          github-api-url: 'https://github.company.com/api/v3'
+          
+          # Standard Options
+          visibility: 'all'
+          include-charts: true
+          data-branch: 'star-tracker-data'
+          max-history: '52'
+          locale: 'en'
+```
+
+## Using with GitHub.com Runners
+
+If using GitHub.com-hosted runners to track GHES repositories:
+
+```yaml
+jobs:
+  track:
+    runs-on: ubuntu-latest  # GitHub.com runner
+    
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GHES_TOKEN }}
+          github-api-url: 'https://github.company.com/api/v3'  # Must specify
+```
+
+<Warning>
+  When using GitHub.com runners with GHES, you MUST explicitly set `github-api-url`. It will not be auto-detected.
+</Warning>
+
+## Network and Firewall Considerations
+
+### Runner Network Access
+
+Ensure your runners can reach the GHES API:
+
+```yaml
+# Test connectivity before running Star Tracker
+steps:
+  - name: Test GHES API connectivity
+    run: |
+      curl -f https://github.company.com/api/v3 || exit 1
+      echo "GHES API is reachable"
+  
+  - uses: fbuireu/github-star-tracker@v1
+    with:
+      github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+      github-api-url: 'https://github.company.com/api/v3'
+```
+
+### Firewall Rules
+
+Ensure these ports are open:
+
+| Port | Protocol | Purpose |
+|------|----------|----------|
+| 443 | HTTPS | GHES API access |
+| 22 | SSH | Git operations (optional) |
+
+### Proxy Configuration
+
+If using a corporate proxy:
+
+```yaml
+env:
+  HTTP_PROXY: 'http://proxy.company.com:8080'
+  HTTPS_PROXY: 'http://proxy.company.com:8080'
+  NO_PROXY: 'localhost,127.0.0.1'
+
+steps:
+  - uses: fbuireu/github-star-tracker@v1
+    with:
+      github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+      github-api-url: 'https://github.company.com/api/v3'
+```
+
+## SSL/TLS Certificates
+
+### Self-Signed Certificates
+
+If your GHES instance uses self-signed certificates:
+
+```yaml
+env:
+  NODE_TLS_REJECT_UNAUTHORIZED: '0'  # Disable SSL verification (not recommended for production)
+
+steps:
+  - uses: fbuireu/github-star-tracker@v1
+    with:
+      github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+      github-api-url: 'https://github.company.com/api/v3'
+```
+
+<Warning>
+  Disabling SSL verification reduces security. For production, use properly signed certificates or configure custom CA certificates.
+</Warning>
+
+### Custom CA Certificates
+
+For enterprise CA certificates:
+
+```yaml
+steps:
+  - name: Install custom CA certificate
+    run: |
+      sudo cp /path/to/ca-cert.crt /usr/local/share/ca-certificates/
+      sudo update-ca-certificates
+  
+  - uses: fbuireu/github-star-tracker@v1
+    with:
+      github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+      github-api-url: 'https://github.company.com/api/v3'
+```
+
+## Version Compatibility
+
+### Supported GHES Versions
+
+GitHub Star Tracker is compatible with:
+
+- **GitHub Enterprise Server 3.0+**
+- **GitHub Enterprise Server 2.22+** (with REST API v3)
+
+<Info>
+  Star Tracker uses the GitHub REST API v3, which is stable across GHES versions. As long as your GHES instance supports REST API v3, Star Tracker should work.
+</Info>
+
+### Checking GHES API Version
+
+Verify your GHES API is accessible:
+
+```bash
+curl https://github.company.com/api/v3
+```
+
+Expected response:
+
+```json
+{
+  "current_user_url": "https://github.company.com/api/v3/user",
+  "authorizations_url": "https://github.company.com/api/v3/authorizations",
+  // ...
+}
+```
+
+## Troubleshooting
+
+### Connection Refused or Timeout
+
+<AccordionGroup>
+  <Accordion title="Verify API URL">
+    Ensure the API URL is correct:
+    ```
+    https://[hostname]/api/v3
+    ```
+    NOT:
+    ```
+    https://[hostname]/api/  # Missing v3
+    https://[hostname]/      # Missing /api/v3
+    ```
+  </Accordion>
+
+  <Accordion title="Test Connectivity">
+    From the runner, test access:
+    ```bash
+    curl -v https://github.company.com/api/v3
+    ```
+  </Accordion>
+
+  <Accordion title="Check Firewall Rules">
+    Ensure port 443 is open from runner to GHES instance.
+  </Accordion>
+
+  <Accordion title="Verify DNS Resolution">
+    Ensure the GHES hostname resolves:
+    ```bash
+    nslookup github.company.com
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Authentication Errors
+
+**401 Unauthorized:**
+- Verify PAT is created on the correct GHES instance
+- Ensure PAT has required scopes (`repo` or `public_repo`)
+- Check PAT hasn't expired
+
+**403 Forbidden:**
+- PAT may lack necessary permissions
+- Organization policies may restrict API access
+- Rate limit may be exceeded (check `X-RateLimit-Remaining` header)
+
+### SSL Certificate Errors
+
+```
+Error: unable to verify the first certificate
+```
+
+**Solutions:**
+- Install custom CA certificate on runner
+- Use properly signed certificate on GHES
+- As last resort, disable SSL verification (not recommended)
+
+### API URL Not Auto-Detected
+
+If running on GHES runners but API URL isn't detected:
+
+```yaml
+# Manually specify even on GHES runners
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    github-api-url: ${{ env.GITHUB_API_URL }}  # Use env var if set
+```
+
+## Mixed Environments
+
+### Tracking Both GitHub.com and GHES
+
+You cannot track both GitHub.com and GHES repos in a single workflow run. Use separate workflows:
+
+```yaml
+# .github/workflows/track-github-com.yml
+name: Track Stars (GitHub.com)
+
+jobs:
+  track-cloud:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_COM_TOKEN }}
+          data-branch: 'stars-github-com'
+```
+
+```yaml
+# .github/workflows/track-ghes.yml
+name: Track Stars (GHES)
+
+jobs:
+  track-enterprise:
+    runs-on: [self-hosted, enterprise]
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GHES_TOKEN }}
+          github-api-url: 'https://github.company.com/api/v3'
+          data-branch: 'stars-ghes'
+```
+
+## Security Considerations
+
+### Token Security
+
+- Never commit GHES tokens to repositories
+- Use repository secrets for token storage
+- Rotate tokens regularly
+- Use minimum required scopes
+
+### Network Security
+
+- Use HTTPS (not HTTP) for API URLs
+- Validate SSL certificates in production
+- Restrict runner network access to necessary endpoints
+- Use proxy servers if required by organization policy
+
+### Audit and Compliance
+
+- GHES administrators can audit PAT usage
+- Review Star Tracker's API calls in GHES audit logs
+- Ensure compliance with organization data policies
+
+## Related Resources
+
+- [Personal Access Token Setup](/guides/personal-access-token)
+- [Workflow Setup Guide](/guides/workflow-setup)
+- [GitHub Enterprise Server Documentation](https://docs.github.com/en/enterprise-server)
+- [GitHub REST API Reference](https://docs.github.com/en/rest)

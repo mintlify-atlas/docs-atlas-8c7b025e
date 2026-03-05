@@ -1,0 +1,157 @@
+---
+title: 'Introduction'
+description: 'Track GitHub star counts across all your repositories with automated reporting, visual charts, and email notifications'
+---
+
+## What is GitHub Star Tracker?
+
+GitHub Star Tracker is a powerful GitHub Action that automatically monitors star counts across all your repositories on a schedule. It generates comprehensive visual reports with charts and badges, tracks historical trends, and sends notifications when changes are detected.
+
+Every time the action runs, it commits artifacts to a dedicated data branch, giving you a complete history of your repository's growth and engagement.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Animated SVG Charts" icon="chart-line">
+    Star history, per-repo trends, top repository comparisons, and growth forecasts with automatic dark/light mode support
+  </Card>
+  
+  <Card title="Historical Tracking" icon="clock-rotate-left">
+    Configurable retention (default 52 snapshots) with JSON persistence to track your growth over time
+  </Card>
+  
+  <Card title="Smart Filtering" icon="filter">
+    Filter by visibility, ownership, minimum stars, regex patterns, archived status, and forks
+  </Card>
+  
+  <Card title="Stargazer Tracking" icon="users">
+    See who starred your repos with avatars and timestamps to understand your community
+  </Card>
+  
+  <Card title="Email Notifications" icon="envelope">
+    Built-in SMTP support with fixed or adaptive thresholds to stay informed of changes
+  </Card>
+  
+  <Card title="Multiple Export Formats" icon="file-export">
+    Generate Markdown, HTML, CSV, and JSON reports for any use case
+  </Card>
+</CardGroup>
+
+## What You Get
+
+Every run, Star Tracker commits these artifacts to your data branch:
+
+### Visual Assets
+
+**Animated SVG Charts** that automatically adapt to dark/light mode:
+- Star history across all repositories
+- Per-repository trend lines
+- Top repositories comparison
+- Growth forecasts based on historical data
+
+**Shields.io-style Badge** with your total star count that updates automatically and can be embedded anywhere.
+
+### Reports and Data
+
+**Markdown & HTML Reports** featuring:
+- Summary tables with delta indicators
+- New and removed repository tracking
+- Stargazer details (when enabled)
+- Forecast tables showing projected growth
+
+**Machine-Readable Exports:**
+- CSV format for spreadsheets and data analysis
+- JSON format for dashboards and downstream pipelines
+
+<Note>
+All generated charts use the `prefers-color-scheme` CSS media query to automatically match the viewer's theme preference. No configuration required!
+</Note>
+
+## How It Works
+
+The action follows a straightforward execution pipeline:
+
+<Steps>
+  <Step title="Configuration & Fetching">
+    Parses your configuration and queries the GitHub REST API to fetch all repositories matching your filters
+  </Step>
+  
+  <Step title="Data Branch Initialization">
+    Creates or accesses an orphan branch (default: `star-tracker-data`) to store historical data
+  </Step>
+  
+  <Step title="Comparison & Analysis">
+    Deserializes the previous snapshot, computes delta metrics, and optionally fetches individual stargazers
+  </Step>
+  
+  <Step title="Forecast Generation">
+    Computes growth forecasts based on historical trends for your top repositories
+  </Step>
+  
+  <Step title="Report Generation">
+    Creates Markdown, HTML, JSON, CSV reports, SVG badges, and animated charts
+  </Step>
+  
+  <Step title="Commit & Notify">
+    Commits all artifacts to the data branch and sends email notifications if configured
+  </Step>
+</Steps>
+
+## Action Outputs
+
+The action provides rich outputs that can be used in downstream workflow steps:
+
+| Output | Description |
+|--------|-------------|
+| `total-stars` | Total star count across all tracked repositories |
+| `stars-changed` | Whether any star counts changed (`true`/`false`) |
+| `new-stars` | Number of stars gained since last run |
+| `lost-stars` | Number of stars lost since last run |
+| `should-notify` | Whether notification threshold was reached |
+| `new-stargazers` | Number of new stargazers detected |
+| `report` | Full Markdown report |
+| `report-html` | HTML report (ideal for email) |
+| `report-csv` | CSV report for data pipelines |
+
+<Info>
+You can chain these outputs to other actions in your workflow. For example, use `total-stars` to update a README badge, or `report` to post to Slack.
+</Info>
+
+## Use Cases
+
+- **Portfolio Tracking**: Monitor star growth across all your open source projects
+- **Team Analytics**: Generate weekly reports for your organization's repositories
+- **Community Engagement**: Track who's starring your repos and when
+- **Growth Metrics**: Use CSV exports in data dashboards and BI tools
+- **Automated Notifications**: Get alerts when star counts change significantly
+- **Historical Analysis**: Understand trends and forecast future growth
+
+## System Requirements
+
+- GitHub Actions workflow with `contents: write` permission
+- Personal Access Token (PAT) with `repo` or `public_repo` scope
+- Node.js 24+ runtime (automatically provided by GitHub Actions)
+
+<Warning>
+The default `GITHUB_TOKEN` provided by GitHub Actions is **not sufficient** because it cannot access the authenticated user's full repository list. You must create a Personal Access Token.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in under 5 minutes
+  </Card>
+  
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Detailed setup instructions with PAT creation
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Explore all configuration options
+  </Card>
+  
+  <Card title="Examples" icon="code" href="/examples">
+    Real-world workflow configurations
+  </Card>
+</CardGroup>

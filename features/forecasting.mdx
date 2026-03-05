@@ -1,0 +1,323 @@
+---
+title: "Forecasting"
+description: "Predict future star growth using statistical models"
+---
+
+## Overview
+
+GitHub Star Tracker includes forecasting capabilities to predict future star growth based on historical data. Two forecasting methods are available: Linear Regression and Weighted Moving Average.
+
+## Forecast Configuration
+
+Forecasting constants are defined in `src/domain/forecast.ts:3`:
+
+```typescript
+export const MIN_SNAPSHOTS = 3;      // Minimum snapshots required
+export const FORECAST_WEEKS = 4;     // Number of weeks to forecast
+```
+
+<Note>
+At least 3 historical snapshots are required to generate a forecast.
+</Note>
+
+## Forecasting Methods
+
+### Linear Regression
+
+Predicts future values using a linear trend line fitted to historical data.
+
+```typescript
+import { linearRegression, ForecastMethod } from '@domain/forecast';
+
+const result = linearRegression([100, 150, 200, 250, 300]);
+
+console.log(result);
+// { slope: 50, intercept: 50 }
+
+// Predict value at time index 5
+const predicted = result.slope * 5 + result.intercept;
+// 300
+```
+
+**Algorithm** (see `src/domain/forecast.ts:38`):
+
+```typescript
+const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+const intercept = (sumY - slope * sumX) / n;
+```
+
+**Best for:**
+- Steady, consistent growth patterns
+- Long-term trend identification
+- Projects with regular star accumulation
+
+### Weighted Moving Average
+
+Calculates average change rate with more weight on recent data points.
+
+```typescript
+import { weightedMovingAverage } from '@domain/forecast';
+
+const avgDelta = weightedMovingAverage([100, 150, 220, 310, 420]);
+
+console.log(avgDelta);
+// Returns weighted average of deltas: [50, 70, 90, 110]
+```
+
+**Algorithm** (see `src/domain/forecast.ts:64`):
+
+```typescript
+const deltas = [];
+for (let i = 1; i < values.length; i++) {
+  deltas.push(values[i] - values[i - 1]);
+}
+
+let weightedSum = 0;
+let totalWeight = 0;
+for (let i = 0; i < deltas.length; i++) {
+  const weight = i + 1;  // Linear weights: 1, 2, 3, ...
+  weightedSum += deltas[i] * weight;
+  totalWeight += weight;
+}
+
+return weightedSum / totalWeight;
+```
+
+**Best for:**
+- Projects with accelerating or decelerating growth
+- Capturing recent momentum changes
+- Short-term predictions
+
+## Computing Forecasts
+
+The `computeForecast` function generates predictions for aggregate and per-repository data:
+
+```typescript
+import { computeForecast } from '@domain/forecast';
+
+const forecastData = computeForecast({
+  history: historyData,
+  topRepoNames: ['owner/repo1', 'owner/repo2']
+});
+
+if (forecastData) {
+  console.log(forecastData);
+  // {
+  //   aggregate: { forecasts: [...] },
+  //   repos: [...]
+  // }
+}
+```
+
+### Return Value
+
+```typescript
+interface ForecastData {
+  aggregate: {
+    forecasts: ForecastResult[];
+  };
+  repos: RepoForecast[];
+}
+
+interface ForecastResult {
+  method: 'linear-regression' | 'weighted-moving-average';
+  points: ForecastPoint[];
+}
+
+interface ForecastPoint {
+  weekOffset: number;  // Weeks from now (1, 2, 3, 4)
+  predicted: number;   // Predicted star count
+}
+```
+
+## Forecast Data Structure
+
+### Aggregate Forecast
+
+Predictions for total stars across all repositories:
+
+```typescript
+{
+  aggregate: {
+    forecasts: [
+      {
+        method: 'linear-regression',
+        points: [
+          { weekOffset: 1, predicted: 1050 },
+          { weekOffset: 2, predicted: 1100 },
+          { weekOffset: 3, predicted: 1150 },
+          { weekOffset: 4, predicted: 1200 }
+        ]
+      },
+      {
+        method: 'weighted-moving-average',
+        points: [
+          { weekOffset: 1, predicted: 1060 },
+          { weekOffset: 2, predicted: 1125 },
+          { weekOffset: 3, predicted: 1195 },
+          { weekOffset: 4, predicted: 1270 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Per-Repository Forecasts
+
+Individual predictions for each specified repository:
+
+```typescript
+{
+  repos: [
+    {
+      repoFullName: 'owner/repo1',
+      forecasts: [
+        { method: 'linear-regression', points: [...] },
+        { method: 'weighted-moving-average', points: [...] }
+      ]
+    },
+    {
+      repoFullName: 'owner/repo2',
+      forecasts: [...]
+    }
+  ]
+}
+```
+
+## Value Clamping
+
+Predicted values are clamped to valid ranges (see `src/domain/forecast.ts:90`):
+
+```typescript
+function clampPrediction(value: number): number {
+  return Math.max(0, Math.round(value));
+}
+```
+
+- Negative predictions are set to 0
+- Values are rounded to whole numbers
+
+## Forecast Visualization
+
+Forecasts can be visualized using the forecast chart:
+
+```typescript
+import { generateForecastSvgChart } from '@presentation/svg-chart';
+
+const chart = generateForecastSvgChart({
+  history: historyData,
+  forecastData: forecastResults,
+  locale: 'en',
+  title: 'Star Growth Forecast'
+});
+```
+
+See [Charts → Forecast Chart](/features/charts) for details.
+
+## Display in Reports
+
+### Markdown Table
+
+Forecasts appear as tables in markdown reports (see `src/presentation/markdown.ts:218`):
+
+```markdown
+## 🔮 Forecast
+
+**Total Stars**
+
+| Method | Week +1 | Week +2 | Week +3 | Week +4 |
+|:---|---:|---:|---:|---:|
+| Linear Regression | 1050 | 1100 | 1150 | 1200 |
+| Weighted Moving Average | 1060 | 1125 | 1195 | 1270 |
+```
+
+### HTML Table
+
+HTML reports display forecasts in styled tables (see `src/presentation/html.ts:230`).
+
+## Implementation Details
+
+### Forecast Generation Pipeline
+
+1. **Validate data**: Check minimum snapshots requirement
+2. **Extract values**: Pull star counts from history snapshots
+3. **Apply methods**: Run both forecasting algorithms
+4. **Generate points**: Create 4 weekly predictions for each method
+5. **Clamp values**: Ensure predictions are valid non-negative integers
+
+### Code Reference
+
+```typescript
+function forecastFromValues(values: number[]): ForecastResult[] {
+  const lastValue = values.at(-1) ?? 0;
+  const n = values.length;
+  const lr = linearRegression(values);
+  const wmaAvgDelta = weightedMovingAverage(values);
+  
+  const lrPoints: ForecastPoint[] = [];
+  const wmaPoints: ForecastPoint[] = [];
+  
+  for (let w = 1; w <= FORECAST_WEEKS; w++) {
+    lrPoints.push({
+      weekOffset: w,
+      predicted: clampPrediction(lr.slope * (n - 1 + w) + lr.intercept)
+    });
+    wmaPoints.push({
+      weekOffset: w,
+      predicted: clampPrediction(lastValue + wmaAvgDelta * w)
+    });
+  }
+  
+  return [
+    { method: ForecastMethod.LINEAR_REGRESSION, points: lrPoints },
+    { method: ForecastMethod.WEIGHTED_MOVING_AVERAGE, points: wmaPoints }
+  ];
+}
+```
+
+See `src/domain/forecast.ts:94`.
+
+## Accuracy Considerations
+
+<Warning>
+Forecasts are statistical predictions and may not reflect actual future values. Accuracy depends on:
+
+- Historical data consistency
+- Growth pattern stability
+- External factors (marketing, features, competition)
+- Sample size (more snapshots = better predictions)
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Multiple Methods" icon="chart-mixed">
+    Compare both methods to get a range of possible outcomes
+  </Card>
+  <Card title="Regular Updates" icon="clock">
+    Update forecasts frequently as new data becomes available
+  </Card>
+  <Card title="Context Matters" icon="lightbulb">
+    Consider external events that might affect star growth
+  </Card>
+  <Card title="Historical Analysis" icon="clock-rotate-left">
+    Review past forecast accuracy to calibrate expectations
+  </Card>
+</CardGroup>
+
+## Forecast Methods Comparison
+
+| Aspect | Linear Regression | Weighted Moving Average |
+|:-------|:------------------|:------------------------|
+| **Complexity** | Simple | Simple |
+| **Best For** | Stable trends | Changing trends |
+| **Sensitivity** | Low | High |
+| **Outliers** | Affected | Less affected |
+| **Recent Data** | Equal weight | More weight |
+
+## Related
+
+- [Charts](/features/charts) - Visualize forecast predictions
+- [Reports](/features/reports) - Include forecasts in reports
+- [Domain Functions](/architecture) - Core forecasting functions

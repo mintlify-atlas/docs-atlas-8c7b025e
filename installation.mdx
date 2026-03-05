@@ -1,0 +1,578 @@
+---
+title: 'Installation'
+description: 'Detailed installation guide for GitHub Star Tracker with Personal Access Token setup and workflow configuration'
+---
+
+## Prerequisites
+
+Before installing GitHub Star Tracker, ensure you have:
+
+- A GitHub account with repositories to track
+- Repository access to create Actions workflows
+- Permissions to create Personal Access Tokens
+- `contents: write` permission in your workflow
+
+<Info>
+The action requires Node.js 24+, but this is automatically provided by GitHub Actions runners. No local installation needed.
+</Info>
+
+## Installation Steps
+
+### Step 1: Create a Personal Access Token
+
+The default `GITHUB_TOKEN` provided by GitHub Actions **cannot** access the full list of repositories for an authenticated user. You must create a Personal Access Token (PAT).
+
+<Note>
+**Why is a PAT required?**
+
+The GitHub API requires authentication to list all repositories accessible to a user. The automatic `GITHUB_TOKEN` is scoped to the current repository only and cannot query the `/user/repos` endpoint needed by this action.
+</Note>
+
+#### Creating a Classic Token (Recommended)
+
+<Steps>
+  <Step title="Navigate to Token Settings">
+    Go to [GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)](https://github.com/settings/tokens)
+  </Step>
+  
+  <Step title="Generate New Token">
+    Click **Generate new token** → **Generate new token (classic)**
+  </Step>
+  
+  <Step title="Configure Token">
+    
+    **Note**: Give your token a descriptive name
+    ```
+    GitHub Star Tracker - YOUR_REPO_NAME
+    ```
+    
+    **Expiration**: Choose based on your needs
+    - `No expiration` - Recommended for continuous tracking
+    - `90 days` - Good balance of security and maintenance
+    - Custom date - For specific tracking periods
+    
+    **Scopes**: Select based on repository visibility
+    
+    <Tabs>
+      <Tab title="Public Repositories Only">
+        Select only:
+        - ✅ `public_repo` - Access public repositories
+      </Tab>
+      
+      <Tab title="All Repositories">
+        Select:
+        - ✅ `repo` - Full control of private repositories
+          - This automatically includes `public_repo`
+      </Tab>
+      
+      <Tab title="Organization Repositories">
+        Select:
+        - ✅ `repo` - Full control of private repositories
+        - ✅ `read:org` - Read org and team membership (optional)
+      </Tab>
+    </Tabs>
+    
+  </Step>
+  
+  <Step title="Generate and Copy">
+    1. Click **Generate token** at the bottom
+    2. **Copy the token immediately** - you won't see it again!
+    3. Store it temporarily in a secure location
+  </Step>
+</Steps>
+
+<Warning>
+**Security Best Practice**: Never commit your PAT to version control or share it publicly. Always use GitHub Secrets.
+</Warning>
+
+#### Alternative: Fine-Grained Personal Access Token
+
+Fine-grained tokens offer more precise permissions but require additional setup:
+
+<Steps>
+  <Step title="Create Fine-Grained Token">
+    Navigate to [Personal access tokens → Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+  </Step>
+  
+  <Step title="Configure Access">
+    
+    **Repository access**: Choose one
+    - All repositories
+    - Only select repositories
+    - Public repositories (this account)
+    
+  </Step>
+  
+  <Step title="Set Permissions">
+    
+    Under **Repository permissions**:
+    - `Contents`: Read and write (for committing to data branch)
+    - `Metadata`: Read-only (automatically included)
+    
+  </Step>
+</Steps>
+
+### Step 2: Add Token as Secret
+
+Store your PAT securely as a repository or organization secret.
+
+#### For a Single Repository
+
+<Steps>
+  <Step title="Navigate to Repository Settings">
+    Go to your repository → **Settings** → **Secrets and variables** → **Actions**
+  </Step>
+  
+  <Step title="Create New Secret">
+    Click **New repository secret**
+  </Step>
+  
+  <Step title="Add Secret Details">
+    
+    **Name**:
+    ```
+    GITHUB_STAR_TRACKER_TOKEN
+    ```
+    
+    **Value**: Paste your PAT from Step 1
+    
+    Click **Add secret**
+    
+  </Step>
+</Steps>
+
+#### For Multiple Repositories (Organization)
+
+<Steps>
+  <Step title="Navigate to Organization Settings">
+    Go to your organization → **Settings** → **Secrets and variables** → **Actions**
+  </Step>
+  
+  <Step title="Create Organization Secret">
+    Click **New organization secret**
+  </Step>
+  
+  <Step title="Configure Secret">
+    
+    **Name**:
+    ```
+    GITHUB_STAR_TRACKER_TOKEN
+    ```
+    
+    **Value**: Paste your PAT
+    
+    **Repository access**: Choose which repos can use this secret
+    - All repositories
+    - Private repositories
+    - Selected repositories
+    
+    Click **Add secret**
+    
+  </Step>
+</Steps>
+
+### Step 3: Create Workflow File
+
+Create the workflow file that will run the Star Tracker action.
+
+<Steps>
+  <Step title="Create Workflow Directory">
+    
+    In your repository, create the workflows directory if it doesn't exist:
+    
+    ```bash
+    mkdir -p .github/workflows
+    ```
+    
+  </Step>
+  
+  <Step title="Create Workflow File">
+    
+    Create `.github/workflows/star-tracker.yml` with your preferred configuration:
+    
+    <CodeGroup>
+    
+    ```yaml Basic Configuration
+    name: Track Stars
+    
+    on:
+      schedule:
+        - cron: '0 0 * * *'  # Daily at midnight UTC
+      workflow_dispatch:      # Manual trigger
+    
+    permissions:
+      contents: write
+    
+    jobs:
+      track:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: fbuireu/github-star-tracker@v1
+            with:
+              github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    ```
+    
+    ```yaml With Filtering
+    name: Track Stars
+    
+    on:
+      schedule:
+        - cron: '0 0 * * *'
+      workflow_dispatch:
+    
+    permissions:
+      contents: write
+    
+    jobs:
+      track:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: fbuireu/github-star-tracker@v1
+            with:
+              github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+              visibility: 'public'           # Only public repos
+              min-stars: '5'                 # Minimum 5 stars
+              include-forks: false           # Exclude forks
+              exclude-repos: 'test-,/^demo/' # Exclude by pattern
+    ```
+    
+    ```yaml Full Featured
+    name: Track Stars
+    
+    on:
+      schedule:
+        - cron: '0 0 * * *'
+      workflow_dispatch:
+    
+    permissions:
+      contents: write
+    
+    jobs:
+      track:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: fbuireu/github-star-tracker@v1
+            with:
+              github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+              visibility: 'all'
+              locale: 'en'
+              include-charts: true
+              track-stargazers: true
+              max-history: 52
+              top-repos: 10
+              notification-threshold: 'auto'
+    ```
+    
+    ```yaml With Email Notifications
+    name: Track Stars
+    
+    on:
+      schedule:
+        - cron: '0 0 * * *'
+      workflow_dispatch:
+    
+    permissions:
+      contents: write
+    
+    jobs:
+      track:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: fbuireu/github-star-tracker@v1
+            with:
+              github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+              smtp-host: smtp.gmail.com
+              smtp-port: 587
+              smtp-username: ${{ secrets.SMTP_USERNAME }}
+              smtp-password: ${{ secrets.SMTP_PASSWORD }}
+              email-to: you@example.com
+              email-from: 'Star Tracker'
+              notification-threshold: '5'
+    ```
+    
+    </CodeGroup>
+    
+  </Step>
+  
+  <Step title="Commit and Push">
+    
+    ```bash
+    git add .github/workflows/star-tracker.yml
+    git commit -m "feat: add GitHub Star Tracker workflow"
+    git push origin main
+    ```
+    
+  </Step>
+</Steps>
+
+### Step 4: Initial Run
+
+Run the action for the first time to initialize the data branch.
+
+#### Via GitHub UI
+
+1. Navigate to your repository on GitHub
+2. Click the **Actions** tab
+3. Select **Track Stars** from the workflows list
+4. Click **Run workflow** → **Run workflow**
+5. Wait for the run to complete (typically 30-60 seconds)
+
+#### Via GitHub CLI
+
+```bash
+# Trigger workflow
+gh workflow run star-tracker.yml
+
+# Watch execution
+gh run watch
+
+# View latest run logs
+gh run view --log
+```
+
+<Info>
+The first run creates the `star-tracker-data` branch and generates the initial snapshot. Subsequent runs will show deltas and trends.
+</Info>
+
+### Step 5: Verify Installation
+
+Confirm everything is working correctly:
+
+<Steps>
+  <Step title="Check Workflow Status">
+    
+    1. Go to **Actions** tab in your repository
+    2. Verify the workflow completed successfully (green checkmark)
+    3. Review the logs for any warnings or errors
+    
+  </Step>
+  
+  <Step title="Inspect Data Branch">
+    
+    1. Switch to the `star-tracker-data` branch
+    2. Verify these files exist:
+       - `README.md` - Markdown report
+       - `stars-badge.svg` - Badge
+       - `history.json` - Historical data
+       - `charts/` directory (if charts enabled)
+    
+    ```bash
+    git fetch
+    git checkout star-tracker-data
+    ls -la
+    ```
+    
+  </Step>
+  
+  <Step title="View Generated Report">
+    
+    Open `README.md` on the data branch to see your first report:
+    
+    ```bash
+    cat README.md
+    ```
+    
+    Or view it on GitHub:
+    ```
+    https://github.com/YOUR_USERNAME/YOUR_REPO/blob/star-tracker-data/README.md
+    ```
+    
+  </Step>
+</Steps>
+
+## Configuration Options
+
+### Core Settings
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `github-token` | **Required** | PAT with `repo` or `public_repo` scope |
+| `data-branch` | `star-tracker-data` | Branch name for storing data |
+| `max-history` | `52` | Maximum snapshots to retain |
+| `locale` | `en` | Report language (`en`, `es`, `ca`, `it`) |
+
+### Filtering Options
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `visibility` | `all` | `public`, `private`, `all`, or `owned` |
+| `min-stars` | `0` | Minimum stars required to track |
+| `include-archived` | `false` | Include archived repositories |
+| `include-forks` | `false` | Include forked repositories |
+| `exclude-repos` | - | Comma-separated names or regex patterns |
+| `only-repos` | - | Only track these specific repositories |
+
+### Chart and Report Options
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `include-charts` | `true` | Generate SVG charts |
+| `top-repos` | `10` | Number of top repos in charts |
+| `track-stargazers` | `false` | Track individual stargazers |
+
+### Notification Options
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `smtp-host` | - | SMTP server hostname |
+| `smtp-port` | `587` | SMTP server port |
+| `smtp-username` | - | SMTP authentication username |
+| `smtp-password` | - | SMTP authentication password |
+| `email-to` | - | Recipient email address |
+| `email-from` | `GitHub Star Tracker` | Sender name |
+| `notification-threshold` | `0` | `0` (always), number, or `auto` |
+| `send-on-no-changes` | `false` | Email even with no changes |
+
+<Note>
+For detailed configuration documentation, see the [Configuration Reference](/configuration/overview).
+</Note>
+
+## Advanced Setup
+
+### Using a Configuration File
+
+For complex setups, use a YAML configuration file instead of inline inputs:
+
+<Steps>
+  <Step title="Create Config File">
+    
+    Create `star-tracker.yml` in your repository root:
+    
+    ```yaml star-tracker.yml
+    visibility: public
+    locale: en
+    includeCharts: true
+    trackStargazers: true
+    dataBranch: star-tracker-data
+    maxHistory: 52
+    topRepos: 10
+    minStars: 5
+    includeArchived: false
+    includeForks: false
+    excludeRepos:
+      - test-repo
+      - /^demo-.*/
+    notificationThreshold: auto
+    ```
+    
+  </Step>
+  
+  <Step title="Reference in Workflow">
+    
+    ```yaml
+    - uses: fbuireu/github-star-tracker@v1
+      with:
+        github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+        config-path: star-tracker.yml
+    ```
+    
+  </Step>
+</Steps>
+
+<Info>
+Workflow inputs override config file settings, allowing environment-specific customization.
+</Info>
+
+### GitHub Enterprise Server
+
+For GitHub Enterprise Server (GHES) instances:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    github-api-url: https://github.example.com/api/v3
+```
+
+<Note>
+The API URL is auto-detected on GHES runners, so this input is typically only needed for custom endpoints.
+</Note>
+
+## Troubleshooting Installation
+
+<AccordionGroup>
+  <Accordion title="Error: Resource not accessible by integration">
+    
+    **Cause**: Missing `contents: write` permission
+    
+    **Solution**: Add permissions to your workflow:
+    ```yaml
+    permissions:
+      contents: write
+    ```
+    
+  </Accordion>
+  
+  <Accordion title="Error: Bad credentials">
+    
+    **Cause**: Invalid or expired PAT
+    
+    **Solutions**:
+    - Verify the secret name matches exactly: `GITHUB_STAR_TRACKER_TOKEN`
+    - Check token hasn't expired in [GitHub Settings](https://github.com/settings/tokens)
+    - Regenerate token with correct scopes (`repo` or `public_repo`)
+    - Update the secret value in repository settings
+    
+  </Accordion>
+  
+  <Accordion title="Error: No repositories found">
+    
+    **Cause**: Filters excluding all repositories
+    
+    **Solutions**:
+    - Remove restrictive filters temporarily: `visibility: all`
+    - Check PAT has access to your repositories
+    - For private repos, ensure PAT has `repo` scope (not just `public_repo`)
+    - Verify `include-forks` and `include-archived` settings
+    
+  </Accordion>
+  
+  <Accordion title="Charts not generating">
+    
+    **Cause**: Insufficient historical data
+    
+    **Solution**: Charts require at least 2 snapshots. Run the action again or wait for next scheduled run.
+    
+  </Accordion>
+  
+  <Accordion title="Data branch not created">
+    
+    **Cause**: Permissions or workflow configuration issue
+    
+    **Solutions**:
+    - Verify `contents: write` permission is set
+    - Check workflow logs for error messages
+    - Ensure PAT has repository access
+    - Try running workflow manually first
+    
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration Guide" icon="sliders" href="/configuration/overview">
+    Explore all configuration options in detail
+  </Card>
+  
+  <Card title="Example Workflows" icon="code" href="/examples">
+    See real-world configuration examples
+  </Card>
+  
+  <Card title="Email Notifications" icon="envelope" href="/email-notifications">
+    Set up SMTP notifications for star changes
+  </Card>
+  
+  <Card title="Viewing Reports" icon="chart-line" href="/guides/embedding-charts">
+    Learn how to access and embed your reports
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you encounter issues during installation:
+
+- Check the [Troubleshooting Guide](/troubleshooting) for detailed solutions
+- Review [GitHub Discussions](https://github.com/fbuireu/github-star-tracker/discussions) for community help
+- Search or open an [issue](https://github.com/fbuireu/github-star-tracker/issues) on GitHub
+- Review the [API Reference](/api/action-inputs) for input/output specifications

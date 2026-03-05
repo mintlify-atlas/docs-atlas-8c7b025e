@@ -1,0 +1,387 @@
+---
+title: "Reports"
+description: "Generate comprehensive star tracking reports in multiple formats"
+---
+
+## Overview
+
+GitHub Star Tracker generates detailed reports showing star counts, changes, trends, and analytics. Reports are available in three formats: Markdown, HTML, and CSV.
+
+## Report Formats
+
+### Markdown Reports
+
+Rich, human-readable reports suitable for README files and documentation.
+
+```typescript
+import { generateMarkdownReport } from '@presentation/markdown';
+
+const report = generateMarkdownReport({
+  results: comparisonResults,
+  previousTimestamp: '2024-01-01T00:00:00Z',
+  locale: 'en',
+  history: historyData,
+  includeCharts: true,
+  stargazerDiff: stargazerDiffResult,
+  forecastData: forecastResults,
+  topRepos: 10
+});
+```
+
+**Features:**
+- Summary statistics with delta indicators
+- Repository table with stars, changes, and trends
+- Embedded SVG charts
+- Collapsible sections for detailed data
+- New stargazer listings with avatars
+- Forecast tables
+- Fully formatted with GitHub-flavored Markdown
+
+See implementation in `src/presentation/markdown.ts:8`.
+
+### HTML Reports
+
+Styled, self-contained HTML documents for email or web display.
+
+```typescript
+import { generateHtmlReport } from '@presentation/html';
+
+const report = generateHtmlReport({
+  results: comparisonResults,
+  previousTimestamp: '2024-01-01T00:00:00Z',
+  locale: 'en',
+  history: historyData,
+  includeCharts: true,
+  stargazerDiff: stargazerDiffResult,
+  forecastData: forecastResults,
+  topRepos: 10
+});
+```
+
+**Features:**
+- Inline CSS styling
+- Responsive layout
+- Color-coded delta indicators
+- Chart URLs (via QuickChart API)
+- Styled tables
+- Professional design suitable for email
+- Complete HTML document structure
+
+See implementation in `src/presentation/html.ts:20`.
+
+### CSV Reports
+
+Machine-readable data export for analysis and integration.
+
+```typescript
+import { generateCsvReport } from '@presentation/csv';
+
+const csv = generateCsvReport(comparisonResults);
+
+console.log(csv);
+// repository,owner,name,stars,previous,delta,status
+// owner/repo1,owner,repo1,1500,1450,50,active
+// owner/repo2,owner,repo2,800,,0,new
+```
+
+**Features:**
+- Standard CSV format
+- Properly escaped fields
+- Status indicators (new, removed, active)
+- Compatible with spreadsheets and data tools
+
+See implementation in `src/presentation/csv.ts:26`.
+
+## Report Parameters
+
+All report generation functions accept a common parameter object:
+
+```typescript
+interface GenerateReportParams {
+  results: ComparisonResults;        // Required: comparison data
+  previousTimestamp: string | null;  // Required: previous snapshot time
+  locale: Locale;                    // Required: language/format locale
+  history?: History | null;          // Optional: for charts
+  includeCharts?: boolean;           // Optional: default true
+  stargazerDiff?: StargazerDiffResult | null;  // Optional: new stargazers
+  forecastData?: ForecastData | null;          // Optional: predictions
+  topRepos?: number;                 // Optional: repos in comparison chart (default 10)
+}
+```
+
+## Report Sections
+
+### Header
+
+Title, date, and summary statistics:
+
+```markdown
+# GitHub Star Tracker Report
+
+**2024-01-15 12:00:00** | Total: **1,337 stars** | Change: **+42**
+
+> Compared to 2024-01-01 00:00:00
+```
+
+### Charts Section
+
+Visualization of star growth:
+
+- **Star History**: Total stars over time with milestone markers
+- **Comparison Chart**: Top N repositories side-by-side
+- **Individual Charts**: Per-repository growth (in collapsible section)
+
+```markdown
+## 📈 Star Trend
+
+![Star History](./charts/star-history.svg)
+
+### By Repository
+
+![Top Repositories](./charts/comparison.svg)
+```
+
+See `src/presentation/markdown.ts:51` for chart generation.
+
+<Note>
+Charts require at least 2 historical snapshots. Set `includeCharts: false` or pass `history: null` to omit.
+</Note>
+
+### Repository Table
+
+Sortable table of all tracked repositories:
+
+```markdown
+## Repositories
+
+| Repository | Stars | Change | Trend |
+|:-----------|------:|-------:|:-----:|
+| [owner/repo1](https://github.com/owner/repo1) | 1500 | +50 | 📈 |
+| [owner/repo2](https://github.com/owner/repo2) `new` | 800 | +800 | 🌟 |
+| [owner/repo3](https://github.com/owner/repo3) | 450 | -10 | 📉 |
+```
+
+Repos are sorted by current star count (descending). New repositories are badged.
+
+### Summary Statistics
+
+```markdown
+## Summary
+
+- **Stars Gained:** 850
+- **Stars Lost:** 10
+- **Net Change:** +840
+```
+
+### Stargazers Section
+
+New stargazers with avatars and profile links:
+
+```markdown
+## 👤 New Stargazers
+
+5 new stargazers since last update
+
+<details>
+<summary>owner/repo (3 stargazers)</summary>
+
+- <img src="..." width="20" height="20" style="border-radius:50%;"> [user1](https://github.com/user1): Starred on 2024-01-15
+
+</details>
+```
+
+See `src/presentation/markdown.ts:133` for rendering.
+
+### Forecast Section
+
+Predictions using multiple methods:
+
+```markdown
+## 🔮 Forecast
+
+**Total Stars**
+
+| Method | Week +1 | Week +2 | Week +3 | Week +4 |
+|:---|---:|---:|---:|---:|
+| Linear Regression | 1387 | 1437 | 1487 | 1537 |
+| Weighted Moving Average | 1390 | 1443 | 1498 | 1555 |
+```
+
+Includes forecast chart and per-repository predictions in collapsible sections.
+
+### Footer
+
+Generation metadata and attribution:
+
+```markdown
+---
+*Generated by [GitHub Star Tracker](https://github.com/fbuireu/github-star-tracker) on 2024-01-15T12:00:00.000Z*
+
+<div align="center">
+
+*Made with ❤️ by [Ferran Buireu](https://github.com/fbuireu)*
+
+</div>
+```
+
+## Chart Integration
+
+### SVG Charts (Markdown)
+
+Markdown reports reference SVG files:
+
+```markdown
+![Star History](./charts/star-history.svg)
+```
+
+Generate chart files separately using functions from `@presentation/svg-chart`.
+
+### Chart URLs (HTML)
+
+HTML reports use QuickChart API for chart rendering:
+
+```typescript
+const chartUrl = generateChartUrl({
+  history,
+  title: 'Star History',
+  locale: 'en'
+});
+// Returns: https://quickchart.io/chart?c={...}
+```
+
+See `src/presentation/chart.ts` for URL generation.
+
+## CSV Format Details
+
+### Header Row
+
+```csv
+repository,owner,name,stars,previous,delta,status
+```
+
+### Data Rows
+
+Each repository is represented as:
+
+```csv
+owner/repo,owner,repo,1500,1450,50,active
+```
+
+### Status Values
+
+- `new`: Repository added since last snapshot
+- `removed`: Repository removed from tracking
+- `active`: Existing repository
+
+See `src/presentation/csv.ts:13` for status logic.
+
+### Field Escaping
+
+Fields containing commas, quotes, or newlines are properly escaped (see `src/presentation/csv.ts:6`):
+
+```typescript
+function escapeCsvField(field: string): string {
+  if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+    return `"${field.replaceAll('"', '""')}"`;
+  }
+  return field;
+}
+```
+
+## Localization
+
+All reports support multiple locales for date formatting and text:
+
+```typescript
+// English
+generateMarkdownReport({ ..., locale: 'en' });
+
+// Spanish
+generateMarkdownReport({ ..., locale: 'es' });
+
+// Japanese
+generateMarkdownReport({ ..., locale: 'ja' });
+```
+
+Locale affects:
+- Date and number formatting
+- Section titles and labels
+- Delta indicators
+- Forecast method names
+
+See [Internationalization](/configuration/localization) for supported locales.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Format Selection" icon="file">
+    Use Markdown for README, HTML for email, CSV for data analysis
+  </Card>
+  <Card title="Chart Inclusion" icon="chart-line">
+    Include charts when displaying to humans, omit for machine consumption
+  </Card>
+  <Card title="Top Repos" icon="ranking-star">
+    Adjust `topRepos` parameter based on your repository count (default: 10)
+  </Card>
+  <Card title="Storage" icon="database">
+    Save generated reports for historical reference and comparison
+  </Card>
+</CardGroup>
+
+## Example Usage
+
+### Generate All Formats
+
+```typescript
+import { 
+  generateMarkdownReport, 
+  generateHtmlReport, 
+  generateCsvReport 
+} from '@presentation';
+
+const params = {
+  results: comparisonResults,
+  previousTimestamp: '2024-01-01T00:00:00Z',
+  locale: 'en',
+  history: historyData,
+  includeCharts: true,
+  stargazerDiff: stargazerDiff,
+  forecastData: forecast,
+  topRepos: 10
+};
+
+const markdown = generateMarkdownReport(params);
+const html = generateHtmlReport(params);
+const csv = generateCsvReport(params.results);
+
+// Save reports
+await fs.writeFile('report.md', markdown);
+await fs.writeFile('report.html', html);
+await fs.writeFile('report.csv', csv);
+```
+
+### Email-Friendly HTML
+
+```typescript
+const html = generateHtmlReport({
+  results,
+  previousTimestamp,
+  locale: 'en',
+  history: null,  // No charts for email
+  includeCharts: false,
+  topRepos: 5  // Fewer repos for brevity
+});
+
+await sendEmail({
+  to: 'user@example.com',
+  subject: 'GitHub Star Tracker Report',
+  html: html
+});
+```
+
+## Related
+
+- [Charts](/features/charts) - Chart generation for reports
+- [Forecasting](/features/forecasting) - Add predictions to reports
+- [Stargazer Tracking](/features/stargazer-tracking) - Include new stargazers
+- [Formatting](/architecture) - Number and date formatting utilities

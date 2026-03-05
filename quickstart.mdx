@@ -1,80 +1,268 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get GitHub Star Tracker running in your repository in under 5 minutes'
 ---
 
-## Get started in three steps
+## Quick Start Guide
 
-Get your documentation site running locally and make your first customization.
+This guide will have you tracking stars across all your repositories in under 5 minutes.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Create a Personal Access Token">
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    A PAT is required because the default `GITHUB_TOKEN` cannot access your full repository list.
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    1. Navigate to [GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)](https://github.com/settings/tokens)
+    2. Click **Generate new token** → **Generate new token (classic)**
+    3. Give it a descriptive name like `Star Tracker`
+    4. Select expiration (recommend **No expiration** for continuous tracking)
+    5. Select scopes:
+       - For public repositories only: `public_repo`
+       - For all repositories: `repo` (full control)
+    6. Click **Generate token** and copy it immediately
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <Warning>
+    Store your token securely! You won't be able to see it again. If you lose it, you'll need to generate a new one.
+    </Warning>
+    
+  </Step>
+  
+  <Step title="Add Token as Repository Secret">
+    
+    1. Go to your repository on GitHub
+    2. Click **Settings** → **Secrets and variables** → **Actions**
+    3. Click **New repository secret**
+    4. Name: `GITHUB_STAR_TRACKER_TOKEN`
+    5. Value: Paste your PAT from step 1
+    6. Click **Add secret**
+    
+    <Info>
+    If you want to use this action across multiple repositories, consider adding it as an **organization secret** instead.
+    </Info>
+    
+  </Step>
+  
+  <Step title="Create the Workflow File">
+    
+    Create a new file in your repository at `.github/workflows/star-tracker.yml`:
+    
+    ```yaml
+    name: Track Stars
+    
+    on:
+      schedule:
+        - cron: '0 0 * * *'  # Run daily at midnight UTC
+      workflow_dispatch:      # Allow manual triggering
+    
+    permissions:
+      contents: write         # Required to commit to data branch
+    
+    jobs:
+      track:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: fbuireu/github-star-tracker@v1
+            with:
+              github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    ```
+    
+    <Note>
+    The `workflow_dispatch` trigger allows you to manually run the action from the Actions tab, perfect for testing!
+    </Note>
+    
+  </Step>
+  
+  <Step title="Commit and Push">
+    
+    ```bash
+    git add .github/workflows/star-tracker.yml
+    git commit -m "Add Star Tracker workflow"
+    git push
+    ```
+    
+  </Step>
+  
+  <Step title="Run the Action Manually">
+    
+    For your first run, trigger it manually to see immediate results:
+    
+    1. Go to your repository on GitHub
+    2. Click the **Actions** tab
+    3. Select **Track Stars** from the left sidebar
+    4. Click **Run workflow** → **Run workflow**
+    5. Wait 30-60 seconds for completion
+    
+    <Info>
+    The first run initializes the data branch and creates the baseline snapshot. Subsequent runs will show deltas and trends.
+    </Info>
+    
+  </Step>
+  
+  <Step title="View Your Reports">
+    
+    After the workflow completes:
+    
+    1. Go to your repository's branches
+    2. Switch to the `star-tracker-data` branch
+    3. Explore the generated files:
+       - `README.md` - Markdown report with summary tables
+       - `stars-badge.svg` - Embeddable badge with star count
+       - `history.json` - Raw historical data
+       - `charts/` - Animated SVG charts
+    
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## What Just Happened?
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Your workflow just:
 
-### Step 3: Go live
+1. **Fetched** all repositories accessible by your PAT
+2. **Counted** the stars on each repository
+3. **Generated** a snapshot with timestamp and metadata
+4. **Created** reports, charts, and a badge
+5. **Committed** everything to the `star-tracker-data` branch
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Embedding Reports in Your README
 
-## Next steps
+### Star Count Badge
 
-Now that you have your docs running, explore these key features:
+Add a live-updating badge to your repository README:
 
-<CardGroup cols={2}>
+```markdown
+![Total Stars](https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/star-tracker-data/stars-badge.svg)
+```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+Replace `YOUR_USERNAME` and `YOUR_REPO` with your actual GitHub username and repository name.
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+### Star History Chart
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+Embed the animated star history chart:
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+```markdown
+![Star History](https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/star-tracker-data/charts/star-history.svg)
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+Charts automatically adapt to the viewer's color scheme (light/dark mode) using CSS media queries!
 </Note>
+
+## Testing the Setup
+
+To verify everything is working:
+
+<CodeGroup>
+
+```bash Manual Test
+# Trigger a manual workflow run
+gh workflow run star-tracker.yml
+
+# Watch the workflow execute
+gh run watch
+```
+
+```bash Check Data Branch
+# Clone your repository and switch to data branch
+git fetch
+git checkout star-tracker-data
+
+# View the generated report
+cat README.md
+```
+
+```bash View in Browser
+# Open the data branch directly in GitHub
+open "https://github.com/YOUR_USERNAME/YOUR_REPO/tree/star-tracker-data"
+```
+
+</CodeGroup>
+
+## Common Quickstart Issues
+
+<AccordionGroup>
+  <Accordion title="Error: Resource not accessible by integration">
+    This means your workflow doesn't have `contents: write` permission. Make sure you've added:
+    
+    ```yaml
+    permissions:
+      contents: write
+    ```
+    
+    at the workflow level (not in the job).
+  </Accordion>
+  
+  <Accordion title="Error: Bad credentials">
+    Your PAT is invalid, expired, or incorrectly stored. Verify:
+    
+    1. The secret name is exactly `GITHUB_STAR_TRACKER_TOKEN`
+    2. The token hasn't expired
+    3. The token has the correct scopes (`repo` or `public_repo`)
+  </Accordion>
+  
+  <Accordion title="No repositories found">
+    The action found no repositories matching the default filters. This could mean:
+    
+    - Your PAT only has `public_repo` scope but you have no public repos
+    - All your repositories are forks (excluded by default)
+    - You need to add `visibility: all` if tracking private repos
+  </Accordion>
+  
+  <Accordion title="Charts not showing trends">
+    Charts require at least 2 historical snapshots to show trends. Run the action a second time or wait for the next scheduled run.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that you have the basics working, explore more advanced features:
+
+<CardGroup cols={2}>
+  <Card title="Configuration Options" icon="sliders" href="/configuration/overview">
+    Filter repositories, customize reports, set thresholds, and more
+  </Card>
+  
+  <Card title="Email Notifications" icon="envelope" href="/email-notifications">
+    Get notified when star counts change
+  </Card>
+  
+  <Card title="Chart Customization" icon="chart-line" href="/features/charts">
+    Customize chart appearance and behavior
+  </Card>
+  
+  <Card title="Advanced Examples" icon="code" href="/examples">
+    Complex workflows with filtering and chaining
+  </Card>
+</CardGroup>
+
+## Scheduling Best Practices
+
+<Info>
+**Recommended Schedule**: Run daily at off-peak hours to minimize API rate limit impact.
+</Info>
+
+```yaml Common Schedules
+on:
+  schedule:
+    # Daily at midnight UTC
+    - cron: '0 0 * * *'
+    
+    # Every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+    
+    # Twice daily (morning and evening UTC)
+    - cron: '0 6,18 * * *'
+    
+    # Weekly on Sunday at midnight
+    - cron: '0 0 * * 0'
+```
+
+Choose a frequency that balances freshness with API quota consumption. For most users, daily tracking is ideal.
+
+## Getting Help
+
+If you run into issues:
+
+- Check the [Troubleshooting Guide](/troubleshooting) for common solutions
+- Review the [Installation Guide](/installation) for detailed setup instructions
+- Search [existing issues](https://github.com/fbuireu/github-star-tracker/issues) or open a new one
+- Join discussions in the [GitHub Discussions](https://github.com/fbuireu/github-star-tracker/discussions)

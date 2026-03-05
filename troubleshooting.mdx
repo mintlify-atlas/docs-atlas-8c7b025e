@@ -1,0 +1,418 @@
+---
+title: Troubleshooting
+description: Common issues and their solutions when using GitHub Star Tracker
+icon: wrench
+---
+
+This guide covers common issues you might encounter when using GitHub Star Tracker and how to resolve them.
+
+## Authentication Issues
+
+### Error: "Bad credentials" or "401 Unauthorized"
+
+**Symptoms:**
+- Workflow fails with authentication error
+- Error message mentions "Bad credentials" or HTTP 401
+
+**Solutions:**
+
+1. **Verify your token is correct**
+   ```yaml
+   - uses: fbuireu/github-star-tracker@v1
+     with:
+       github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+   ```
+   Make sure the secret name matches exactly.
+
+2. **Check token permissions**
+   - Classic tokens need `repo` scope (or `public_repo` for public repos only)
+   - Fine-grained tokens need:
+     - **Repository permissions:** Contents (read), Metadata (read)
+     - If using data-branch: Contents (read and write)
+
+3. **Regenerate the token**
+   - Go to [GitHub Settings > Tokens](https://github.com/settings/tokens)
+   - Delete the old token
+   - Create a new token with correct scopes
+   - Update the repository secret
+
+<Warning>
+  The default `GITHUB_TOKEN` provided by GitHub Actions **does not work** for this action. You must create a Personal Access Token (PAT).
+</Warning>
+
+### Error: "Resource not accessible by integration"
+
+**Symptoms:**
+- Workflow fails when trying to write to data branch
+- Error mentions resource access
+
+**Solutions:**
+
+1. **Check workflow permissions**
+   ```yaml
+   permissions:
+     contents: write  # Required for data-branch
+   ```
+
+2. **Verify token has write access**
+   - Classic token: Needs `repo` scope (not just `public_repo`)
+   - Fine-grained token: Needs Contents with read **and write** access
+
+## Repository Filtering Issues
+
+### Not all repositories are being tracked
+
+**Symptoms:**
+- Some repositories are missing from reports
+- Star count seems lower than expected
+
+**Solutions:**
+
+1. **Check visibility filter**
+   ```yaml
+   visibility: 'all'  # Options: public, private, all, owned
+   ```
+   - `public`: Only public repos
+   - `private`: Only private repos
+   - `all`: Public and private repos
+   - `owned`: Only repos you own (excludes org repos)
+
+2. **Check exclude patterns**
+   ```yaml
+   exclude-repos: 'test-repo,/^demo-.*/'  # Remove or adjust
+   ```
+
+3. **Check minimum stars threshold**
+   ```yaml
+   min-stars: '0'  # Set to 0 to include all repos
+   ```
+
+4. **Check archived/fork settings**
+   ```yaml
+   include-archived: true
+   include-forks: true
+   ```
+
+### Regex exclusion patterns not working
+
+**Symptoms:**
+- Repositories matching regex pattern are still being tracked
+
+**Solutions:**
+
+1. **Use correct regex syntax**
+   ```yaml
+   # Correct - wrapped in forward slashes
+   exclude-repos: '/^test-.*$/,/demo/'
+   
+   # Incorrect - missing slashes
+   exclude-repos: '^test-.*$,demo'
+   ```
+
+2. **Test your regex pattern**
+   - Use regex testing tools to verify your pattern
+   - Make sure it matches the full repository name (not including owner)
+
+## Data Branch Issues
+
+### Error: "Failed to push to data branch"
+
+**Symptoms:**
+- Workflow fails during git push step
+- Data branch is not being updated
+
+**Solutions:**
+
+1. **Check branch protection rules**
+   - Go to Repository Settings > Branches
+   - If data branch has protection rules, either:
+     - Remove protection from the data branch
+     - Or adjust rules to allow the action to push
+
+2. **Verify write permissions**
+   ```yaml
+   permissions:
+     contents: write
+   ```
+
+3. **Check if branch was manually deleted**
+   - The action will recreate the branch automatically
+   - Wait for next run or trigger manually
+
+### Charts or reports not updating
+
+**Symptoms:**
+- Old data is still showing
+- Changes not reflected in badges or charts
+
+**Solutions:**
+
+1. **Clear browser cache**
+   - GitHub serves images with caching headers
+   - Force refresh: Ctrl+F5 (Windows/Linux) or Cmd+Shift+R (Mac)
+
+2. **Add cache-busting query parameter**
+   ```markdown
+   ![Stars](https://raw.githubusercontent.com/USER/REPO/star-tracker-data/stars-badge.svg?v=1)
+   ```
+   Increment `v=` each time to force refresh.
+
+3. **Check workflow actually ran**
+   - Go to Actions tab
+   - Verify the workflow completed successfully
+   - Check the data branch for new commits
+
+## Email Notification Issues
+
+### Emails not being received
+
+**Symptoms:**
+- Workflow runs successfully
+- No emails arrive
+
+**Solutions:**
+
+1. **Verify SMTP configuration**
+   ```yaml
+   smtp-host: 'smtp.gmail.com'
+   smtp-port: '587'
+   smtp-username: ${{ secrets.SMTP_USERNAME }}
+   smtp-password: ${{ secrets.SMTP_PASSWORD }}
+   email-to: 'your-email@example.com'
+   ```
+
+2. **Check spam folder**
+   - Mark as "Not Spam" to whitelist future emails
+   - Add sender to contacts
+
+3. **For Gmail users:**
+   - Use an [App Password](https://support.google.com/accounts/answer/185833), not your regular password
+   - Enable "Less secure app access" (not recommended) or use App Password
+
+4. **Check notification threshold**
+   ```yaml
+   notification-threshold: '0'  # Send on every change
+   send-on-no-changes: true     # Send even with no changes
+   ```
+
+5. **Check workflow logs**
+   - Look for SMTP connection errors
+   - Common issues: Wrong port, authentication failure, blocked by firewall
+
+### Email format looks broken
+
+**Symptoms:**
+- HTML not rendering properly
+- Images not loading
+
+**Solutions:**
+
+1. **Images need public URLs**
+   - Data branch must be in a public repository, or
+   - Use a different hosting solution for images
+
+2. **Some email clients strip styles**
+   - This is normal behavior for security
+   - The action uses inline styles for best compatibility
+
+## Chart Generation Issues
+
+### Charts not appearing
+
+**Symptoms:**
+- Chart files missing from data branch
+- Broken image links in README
+
+**Solutions:**
+
+1. **Verify charts are enabled**
+   ```yaml
+   include-charts: true
+   ```
+
+2. **Check for enough data**
+   - Charts need at least 2 snapshots to show trends
+   - Run the workflow at least twice
+
+3. **Verify file paths**
+   ```markdown
+   ![Chart](https://raw.githubusercontent.com/USER/REPO/star-tracker-data/charts/star-history.svg)
+   ```
+   Make sure branch name and path are correct.
+
+### Charts not showing dark mode
+
+**Symptoms:**
+- Charts always show in light mode
+- Dark mode toggle not working
+
+**Solutions:**
+
+1. **Use system/browser dark mode**
+   - SVG charts use `prefers-color-scheme` media query
+   - Toggle your system or browser theme
+
+2. **GitHub's dark mode should work automatically**
+   - No configuration needed
+   - If not working, clear cache and refresh
+
+## Performance Issues
+
+### Workflow runs very slowly
+
+**Symptoms:**
+- Workflow takes many minutes to complete
+- Timeout errors
+
+**Solutions:**
+
+1. **Disable stargazer tracking**
+   ```yaml
+   track-stargazers: false  # Much faster
+   ```
+   Stargazer tracking requires additional API calls per repository.
+
+2. **Reduce number of repositories**
+   ```yaml
+   min-stars: '10'  # Only track repos with 10+ stars
+   exclude-repos: '/^archive-.*$/'  # Exclude archived projects
+   ```
+
+3. **Reduce top-repos count**
+   ```yaml
+   top-repos: '5'  # Fewer repos in charts = faster generation
+   ```
+
+### GitHub API rate limit exceeded
+
+**Symptoms:**
+- Error message mentions rate limit
+- Workflow fails after fetching some repositories
+
+**Solutions:**
+
+1. **Use authenticated token**
+   - Authenticated requests get 5,000/hour (vs 60/hour for unauthenticated)
+   - Make sure token is provided and valid
+
+2. **Reduce API calls**
+   ```yaml
+   track-stargazers: false  # Significantly reduces API calls
+   ```
+
+3. **Run less frequently**
+   ```yaml
+   on:
+     schedule:
+       - cron: '0 0 * * 0'  # Weekly instead of daily
+   ```
+
+<Note>
+  With stargazer tracking disabled, the action typically uses fewer than 10 API requests for most users.
+</Note>
+
+## Configuration Issues
+
+### Error: "Invalid configuration"
+
+**Symptoms:**
+- Workflow fails with configuration validation error
+
+**Solutions:**
+
+1. **Check YAML syntax**
+   ```yaml
+   # Use a YAML validator
+   # Common issues:
+   - visibility: all      # ❌ Missing quotes
+   - visibility: 'all'    # ✅ Correct
+   ```
+
+2. **Verify input types**
+   ```yaml
+   max-history: '52'      # String
+   include-charts: true   # Boolean (no quotes)
+   min-stars: '0'         # String (for numeric inputs)
+   ```
+
+3. **Check for typos in option names**
+   ```yaml
+   # Wrong
+   visibility-filter: 'all'
+   
+   # Correct
+   visibility: 'all'
+   ```
+
+### Config file not being loaded
+
+**Symptoms:**
+- Custom config file is ignored
+- Default settings are used
+
+**Solutions:**
+
+1. **Verify file path**
+   ```yaml
+   config-path: 'star-tracker.yml'  # Relative to repo root
+   ```
+
+2. **Check file exists**
+   ```bash
+   ls -la star-tracker.yml
+   ```
+
+3. **Workflow inputs override config file**
+   - If both are provided, workflow inputs take precedence
+
+## GitHub Enterprise Issues
+
+### Action not working on GitHub Enterprise Server
+
+**Symptoms:**
+- API connection fails on GHES instance
+
+**Solutions:**
+
+1. **Specify API URL explicitly**
+   ```yaml
+   github-api-url: 'https://github.example.com/api/v3'
+   ```
+
+2. **Check GHES version**
+   - Action requires GHES 3.0 or later
+   - Some features may not be available on older versions
+
+3. **Verify SSL certificates**
+   - Self-signed certificates may cause connection issues
+   - Contact your GHES administrator
+
+## Getting Help
+
+If none of these solutions work:
+
+1. **Enable debug logging**
+   - Go to repository Settings > Secrets and variables > Actions
+   - Add a secret: `ACTIONS_STEP_DEBUG` = `true`
+   - Re-run the workflow
+   - Check detailed logs for more information
+
+2. **Check existing issues**
+   - [GitHub Issues](https://github.com/fbuireu/github-star-tracker/issues)
+   - Someone may have already reported your issue
+
+3. **Open a bug report**
+   - Use the [bug report template](https://github.com/fbuireu/github-star-tracker/issues/new?template=bug_report.yml)
+   - Include:
+     - Full error message
+     - Workflow configuration (redact secrets)
+     - Debug logs if available
+     - Steps to reproduce
+
+4. **Ask in Discussions**
+   - [GitHub Discussions](https://github.com/fbuireu/github-star-tracker/discussions)
+   - Community members may have experienced similar issues
+
+<Note>
+  When sharing logs or configurations, always redact sensitive information like tokens, passwords, and email addresses.
+</Note>

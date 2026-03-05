@@ -1,0 +1,369 @@
+---
+title: Embedding Charts and Badges
+description: How to embed star count badges, history charts, and visualizations in your README and documentation
+---
+
+GitHub Star Tracker generates SVG badges and charts that you can embed in your README, documentation, or any web page. All visualizations automatically adapt to dark and light themes.
+
+## Available Visualizations
+
+Star Tracker generates the following embeddable assets:
+
+- **Star Badge** - Total star count badge
+- **Star History** - Historical star count over time
+- **Repository Comparison** - Compare your top repositories
+- **Growth Forecast** - Predicted future star growth
+- **Per-Repository Charts** - Individual charts for each repo
+
+All charts are stored in the data branch (`star-tracker-data` by default) after each workflow run.
+
+## Star Count Badge
+
+The star badge displays your total star count in a Shields.io-style format.
+
+### Embedding the Badge
+
+```markdown
+![Stars](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-badge.svg)
+```
+
+**Replace:**
+- `USERNAME` with your GitHub username
+- `REPOSITORY` with your repository name
+
+### Badge Example
+
+```markdown
+![Stars](https://raw.githubusercontent.com/octocat/hello-world/star-tracker-data/stars-badge.svg)
+```
+
+### Badge Customization
+
+The badge automatically:
+- Updates after each workflow run
+- Adapts to dark/light theme
+- Shows formatted star count (e.g., "1.2k" for 1,200 stars)
+
+<Note>
+  The badge URL points to the `star-tracker-data` branch. Ensure the workflow has run at least once to generate the badge.
+</Note>
+
+## Star History Chart
+
+Displays the historical trend of your total star count over time.
+
+### Embedding Star History
+
+```markdown
+![Star History](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/star-history.svg)
+```
+
+### Full Example
+
+```markdown
+## Star History
+
+Track the growth of our project over time:
+
+![Star History](https://raw.githubusercontent.com/octocat/hello-world/star-tracker-data/charts/star-history.svg)
+```
+
+### Chart Features
+
+- **Animated** - Smooth animations on page load
+- **Interactive** - Hover to see exact values
+- **Responsive** - Adapts to container width
+- **Theme-aware** - Auto dark/light mode
+
+## Repository Comparison Chart
+
+Compares star counts across your top repositories.
+
+### Embedding Comparison Chart
+
+```markdown
+![Top Repositories](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/comparison.svg)
+```
+
+### Example
+
+```markdown
+## Top Repositories
+
+Our most popular projects:
+
+![Top Repositories](https://raw.githubusercontent.com/octocat/hello-world/star-tracker-data/charts/comparison.svg)
+```
+
+<Info>
+  The number of repositories shown is controlled by the `top-repos` input (default: 10).
+</Info>
+
+## Growth Forecast Chart
+
+Shows predicted future star growth based on historical trends.
+
+### Embedding Forecast Chart
+
+```markdown
+![Growth Forecast](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/forecast.svg)
+```
+
+### Example
+
+```markdown
+## Growth Projection
+
+Projected star growth for the next quarter:
+
+![Growth Forecast](https://raw.githubusercontent.com/octocat/hello-world/star-tracker-data/charts/forecast.svg)
+```
+
+## Per-Repository Charts
+
+Individual charts are generated for each repository in the `charts/` directory.
+
+### Naming Convention
+
+```
+charts/repo-{OWNER}-{REPO}.svg
+```
+
+### Embedding Individual Repository Chart
+
+```markdown
+![Repo Chart](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/repo-octocat-hello-world.svg)
+```
+
+## Complete README Example
+
+Here's a complete example integrating all visualizations:
+
+```markdown
+# My Projects
+
+![Total Stars](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-badge.svg)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+
+## Overview
+
+Welcome to my project portfolio! Track our growth and popularity below.
+
+## Star History
+
+See how our projects have grown over time:
+
+![Star History](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/star-history.svg)
+
+## Top Repositories
+
+Our most starred projects:
+
+![Repository Comparison](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/comparison.svg)
+
+## Growth Forecast
+
+Projected star growth:
+
+![Growth Forecast](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/forecast.svg)
+
+## Featured Project
+
+Detailed stats for our flagship project:
+
+![Featured Repo](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/repo-USERNAME-featured-project.svg)
+```
+
+## Dark/Light Mode Support
+
+All SVG charts automatically adapt to the viewer's color scheme using CSS media queries.
+
+### How It Works
+
+The SVGs include embedded CSS:
+
+```css
+@media (prefers-color-scheme: dark) {
+  /* Dark mode styles */
+}
+
+@media (prefers-color-scheme: light) {
+  /* Light mode styles */
+}
+```
+
+<Tip>
+  No configuration needed! Charts automatically match the viewer's system theme preference.
+</Tip>
+
+## Using in HTML
+
+Embed charts in HTML documents:
+
+```html
+<!-- Badge -->
+<img src="https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-badge.svg" alt="Stars" />
+
+<!-- Star History -->
+<img src="https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/star-history.svg" alt="Star History" width="800" />
+
+<!-- Comparison Chart -->
+<img src="https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/comparison.svg" alt="Top Repositories" width="800" />
+```
+
+## Chart Configuration
+
+Control chart generation in your workflow:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    include-charts: true      # Enable/disable chart generation
+    top-repos: '10'           # Number of repos in comparison chart
+```
+
+### Disabling Charts
+
+If you only want the data without charts:
+
+```yaml
+include-charts: false  # Skip chart generation
+```
+
+This reduces workflow execution time and storage usage.
+
+## Accessing Charts
+
+### Via GitHub Interface
+
+<Steps>
+  <Step title="Navigate to Data Branch">
+    Go to your repository and switch to the `star-tracker-data` branch
+  </Step>
+
+  <Step title="Browse Charts Directory">
+    Open the `charts/` folder to see all generated SVG files
+  </Step>
+
+  <Step title="View or Download">
+    Click any SVG file to view it in GitHub or download it
+  </Step>
+</Steps>
+
+### Via Raw GitHub URLs
+
+Always use raw GitHub URLs for embedding:
+
+```
+https://raw.githubusercontent.com/USERNAME/REPOSITORY/BRANCH/PATH
+```
+
+**Components:**
+- `USERNAME` - Your GitHub username or organization
+- `REPOSITORY` - Repository name
+- `BRANCH` - Usually `star-tracker-data`
+- `PATH` - File path (e.g., `charts/star-history.svg`)
+
+<Warning>
+  Do NOT use `github.com/USERNAME/REPOSITORY/blob/...` URLs. These won't render properly. Always use `raw.githubusercontent.com`.
+</Warning>
+
+## Caching and Updates
+
+### GitHub CDN Caching
+
+GitHub's CDN may cache raw file content:
+
+- **Cache Duration**: ~5 minutes
+- **Impact**: Newly updated charts may not show immediately
+- **Solution**: Wait a few minutes or force refresh your browser
+
+### Force Cache Refresh
+
+Add a cache-busting query parameter:
+
+```markdown
+![Star History](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/star-history.svg?v=1)
+```
+
+Increment `v=1` to `v=2`, etc., after workflow runs to force new cache.
+
+## Troubleshooting
+
+### Charts Not Showing
+
+<AccordionGroup>
+  <Accordion title="Verify Data Branch Exists">
+    Check that the workflow has run successfully and created the `star-tracker-data` branch.
+  </Accordion>
+
+  <Accordion title="Check File Paths">
+    Ensure the chart file exists:
+    ```
+    https://github.com/USERNAME/REPOSITORY/tree/star-tracker-data/charts
+    ```
+  </Accordion>
+
+  <Accordion title="Use Raw URLs">
+    Always use `raw.githubusercontent.com` URLs, not regular GitHub URLs.
+  </Accordion>
+
+  <Accordion title="Enable Chart Generation">
+    Verify `include-charts: true` in your workflow configuration.
+  </Accordion>
+</AccordionGroup>
+
+### Dark Mode Not Working
+
+- The viewer's browser/system must support `prefers-color-scheme` media query
+- Some older browsers don't support automatic theme detection
+- GitHub's rendering may not show dark mode in preview
+
+### Badge Shows Wrong Count
+
+- Wait for workflow to complete after new stars
+- GitHub CDN may cache the old badge (wait ~5 minutes)
+- Check that workflow completed successfully
+
+## Advanced Usage
+
+### Multiple Badges in Header
+
+```markdown
+![Stars](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-badge.svg)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/USERNAME/REPOSITORY/star-tracker.yml)
+![Last Commit](https://img.shields.io/github/last-commit/USERNAME/REPOSITORY)
+```
+
+### Collapsible Charts Section
+
+```markdown
+<details>
+<summary>📊 View Star Statistics</summary>
+
+## Star History
+
+![Star History](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/star-history.svg)
+
+## Top Repositories
+
+![Top Repos](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/charts/comparison.svg)
+
+</details>
+```
+
+### Linking to Data Branch
+
+```markdown
+![Stars](https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-badge.svg)
+
+[📈 View detailed star tracking data →](https://github.com/USERNAME/REPOSITORY/tree/star-tracker-data)
+```
+
+## Related Resources
+
+- [Data Management Guide](/guides/data-management)
+- [Workflow Setup](/guides/workflow-setup)
+- [Chart Configuration Reference](/api/action-inputs)

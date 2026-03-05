@@ -1,0 +1,479 @@
+---
+title: Data Management
+description: Understanding how Star Tracker stores, rotates, and manages historical data
+---
+
+GitHub Star Tracker stores all tracking data, reports, and visualizations in a dedicated Git branch. This guide explains the data structure, retention policies, and how to manage your historical data.
+
+## Data Storage Overview
+
+Star Tracker uses a Git branch to persist all data:
+
+- **Default Branch**: `star-tracker-data`
+- **Storage Type**: Orphan branch (no parent commits)
+- **Update Method**: Git commits after each workflow run
+- **Structure**: JSON, SVG, CSV, and Markdown files
+
+From the source code (src/infrastructure/persistence/storage.ts:109-130):
+
+```typescript
+export function commitAndPush({ dataDir, dataBranch, message }: CommitAndPushParams): boolean {
+  const cwd = path.resolve(dataDir);
+  
+  execute({ cmd: 'git add -A', options: { cwd } });
+  
+  try {
+    execute({ cmd: 'git diff --cached --quiet', options: { cwd } });
+    core.info('No data changes to commit');
+    return false;
+  } catch {
+    core.debug('Staged changes detected, proceeding with commit');
+  }
+  
+  execute({ cmd: `git commit -m "${message}"`, options: { cwd } });
+  execute({ cmd: `git push origin HEAD:${dataBranch}`, options: { cwd } });
+  
+  core.info(`Data committed and pushed to ${dataBranch}`);
+  return true;
+}
+```
+
+## Data Structure
+
+The data branch contains the following structure:
+
+```
+star-tracker-data/
+├── stars-data.json       # Historical snapshots
+├── stars-data.csv        # CSV export
+├── stargazers.json       # Stargazer tracking data (if enabled)
+├── stars-badge.svg       # Total stars badge
+├── README.md             # Markdown report
+├── charts/
+│   ├── star-history.svg
+│   ├── comparison.svg
+│   ├── forecast.svg
+│   └── repo-*.svg        # Per-repository charts
+```
+
+### File Descriptions
+
+| File | Purpose | Format |
+|------|---------|--------|
+| `stars-data.json` | Historical snapshot array with timestamps | JSON |
+| `stars-data.csv` | Tabular export for spreadsheets | CSV |
+| `stargazers.json` | Individual stargazer data (optional) | JSON |
+| `stars-badge.svg` | Total star count badge | SVG |
+| `README.md` | Human-readable report | Markdown |
+| `charts/*.svg` | Visual charts and graphs | SVG |
+
+## Historical Snapshots
+
+The `stars-data.json` file contains an array of snapshots, each representing a workflow run.
+
+### Snapshot Structure
+
+```json
+{
+  "snapshots": [
+    {
+      "timestamp": "2024-03-05T00:00:00.000Z",
+      "totalStars": 1543,
+      "repositories": [
+        {
+          "name": "awesome-project",
+          "owner": "username",
+          "stars": 847,
+          "previousStars": 842,
+          "change": 5,
+          "url": "https://github.com/username/awesome-project"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Data Retention and Rotation
+
+### Maximum History Setting
+
+Control how many snapshots to keep:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    max-history: '52'  # Keep 52 snapshots (default)
+```
+
+### Retention Examples
+
+| Schedule | `max-history` | Retention Period |
+|----------|---------------|------------------|
+| Daily | 365 | 1 year |
+| Daily | 30 | 1 month |
+| Weekly | 52 | 1 year |
+| Weekly | 12 | ~3 months |
+| Monthly | 12 | 1 year |
+
+<Info>
+  When the snapshot limit is reached, the oldest snapshot is removed automatically during the next workflow run.
+</Info>
+
+### Rotation Behavior
+
+From the source code logic (src/infrastructure/persistence/storage.ts:24-28):
+
+```typescript
+export function writeHistory({ dataDir, history }: WriteHistoryParams): void {
+  const filePath = path.join(dataDir, 'stars-data.json');
+  fs.writeFileSync(filePath, JSON.stringify(history, null, 2));
+}
+```
+
+Rotation happens before writing:
+1. Load existing snapshots
+2. Add new snapshot
+3. If count exceeds `max-history`, remove oldest
+4. Write updated history
+
+## Accessing Historical Data
+
+### Via GitHub Interface
+
+<Steps>
+  <Step title="Navigate to Data Branch">
+    Go to your repository and click the branch dropdown, then select `star-tracker-data`
+  </Step>
+
+  <Step title="Browse Files">
+    Click any file to view its contents directly in GitHub
+  </Step>
+
+  <Step title="View History">
+    Click **History** to see all commits and changes over time
+  </Step>
+</Steps>
+
+### Via Git Clone
+
+Clone the data branch locally:
+
+```bash
+git clone -b star-tracker-data https://github.com/USERNAME/REPOSITORY.git star-data
+cd star-data
+```
+
+### Via Raw URLs
+
+Access data files directly:
+
+```bash
+# JSON data
+curl https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-data.json
+
+# CSV export
+curl https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-data.csv
+
+# Badge
+curl https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-badge.svg
+```
+
+## CSV Export
+
+The CSV export provides tabular data suitable for spreadsheets and data analysis tools.
+
+### CSV Format
+
+```csv
+Timestamp,Repository,Owner,Stars,Change
+2024-03-05T00:00:00.000Z,awesome-project,username,847,5
+2024-03-05T00:00:00.000Z,another-repo,username,696,-2
+2024-02-27T00:00:00.000Z,awesome-project,username,842,3
+```
+
+From the source code (src/infrastructure/persistence/storage.ts:97-101):
+
+```typescript
+export function writeCsv({ dataDir, csv }: WriteCsvParams): void {
+  const filePath = path.join(dataDir, 'stars-data.csv');
+  fs.writeFileSync(filePath, csv);
+}
+```
+
+### Using CSV Data
+
+Import into:
+- **Excel/Google Sheets**: For manual analysis and charts
+- **BI Tools**: Power BI, Tableau, Looker
+- **Python/R**: Pandas, tidyverse for data science
+- **Databases**: Load into SQL databases for queries
+
+## Stargazer Data
+
+When `track-stargazers: true` is enabled, individual stargazer information is stored.
+
+### Stargazer Structure
+
+```json
+{
+  "username/repo-name": [
+    {
+      "login": "octocat",
+      "avatar_url": "https://avatars.githubusercontent.com/u/583231",
+      "starred_at": "2024-03-01T12:34:56Z"
+    }
+  ]
+}
+```
+
+From the source code (src/infrastructure/persistence/storage.ts:86-90):
+
+```typescript
+export function writeStargazers({ dataDir, stargazerMap }: WriteStargazersParams): void {
+  const filePath = path.join(dataDir, 'stargazers.json');
+  fs.writeFileSync(filePath, JSON.stringify(stargazerMap, null, 2));
+}
+```
+
+<Warning>
+  Stargazer tracking significantly increases API usage and data size. Only enable if you need individual stargazer information.
+</Warning>
+
+## Data Branch Configuration
+
+### Custom Branch Name
+
+Use a different branch name:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    data-branch: 'custom-star-data'  # Custom branch name
+```
+
+### Branch Initialization
+
+The data branch is created automatically as an orphan branch on first run:
+
+```bash
+git checkout --orphan star-tracker-data
+git rm -rf .
+# Add initial data files
+git commit -m "Initialize star tracker data"
+git push origin star-tracker-data
+```
+
+<Info>
+  Orphan branches have no parent commits and independent history, keeping tracking data separate from your main codebase.
+</Info>
+
+## Manual Data Management
+
+### Viewing Commit History
+
+See all data updates:
+
+```bash
+git clone -b star-tracker-data https://github.com/USERNAME/REPOSITORY.git
+cd REPOSITORY
+git log --oneline
+```
+
+### Reverting to Previous Snapshot
+
+Roll back to an earlier state:
+
+```bash
+# View commits
+git log --oneline
+
+# Revert to specific commit
+git reset --hard COMMIT_HASH
+
+# Force push (caution!)
+git push origin star-tracker-data --force
+```
+
+<Warning>
+  Force pushing overwrites history. Ensure you have backups before performing destructive operations.
+</Warning>
+
+### Exporting All Historical Data
+
+Create a complete backup:
+
+```bash
+# Clone data branch
+git clone -b star-tracker-data https://github.com/USERNAME/REPOSITORY.git star-backup
+
+# Create archive
+tar -czf star-tracker-backup-$(date +%Y%m%d).tar.gz star-backup/
+```
+
+### Pruning Old Data
+
+Manually reduce history size:
+
+<Steps>
+  <Step title="Clone Data Branch">
+    ```bash
+    git clone -b star-tracker-data https://github.com/USERNAME/REPOSITORY.git
+    cd REPOSITORY
+    ```
+  </Step>
+
+  <Step title="Edit stars-data.json">
+    Open `stars-data.json` and remove old snapshots:
+    ```json
+    {
+      "snapshots": [
+        // Keep only recent snapshots
+      ]
+    }
+    ```
+  </Step>
+
+  <Step title="Commit and Push">
+    ```bash
+    git add stars-data.json
+    git commit -m "Prune historical data"
+    git push origin star-tracker-data
+    ```
+  </Step>
+</Steps>
+
+## Data Size Considerations
+
+### Estimating Storage
+
+Approximate sizes per snapshot:
+
+| Data Type | Size per Snapshot | Notes |
+|-----------|-------------------|-------|
+| Basic JSON | 1-5 KB | Minimal data |
+| With 50 repos | 10-20 KB | Repository details |
+| With charts | 50-100 KB | SVG files |
+| With stargazers | 50-500 KB | Depends on stargazer count |
+
+### Storage Over Time
+
+**Example**: Daily tracking, 52 snapshots, 50 repositories, charts enabled:
+
+```
+20 KB/snapshot × 52 snapshots = ~1 MB
++ SVG charts (~500 KB)
+= ~1.5 MB total
+```
+
+<Tip>
+  GitHub repositories have soft limits around 1 GB. Star Tracker data is typically negligible compared to this limit.
+</Tip>
+
+## Integrating with External Systems
+
+### Webhooks on Data Update
+
+Trigger external systems when data is updated:
+
+```yaml
+- name: Track stars
+  id: tracker
+  uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+- name: Trigger webhook
+  if: steps.tracker.outputs.stars-changed == 'true'
+  run: |
+    curl -X POST https://your-webhook-url.com/star-update \
+      -H "Content-Type: application/json" \
+      -d '{
+        "total_stars": "${{ steps.tracker.outputs.total-stars }}",
+        "new_stars": "${{ steps.tracker.outputs.new-stars }}",
+        "data_url": "https://raw.githubusercontent.com/${{ github.repository }}/star-tracker-data/stars-data.json"
+      }'
+```
+
+### Loading Data in Applications
+
+Fetch and use JSON data:
+
+```javascript
+// Fetch star tracking data
+const response = await fetch(
+  'https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-data.json'
+);
+const data = await response.json();
+
+// Access snapshots
+const latestSnapshot = data.snapshots[data.snapshots.length - 1];
+console.log(`Total stars: ${latestSnapshot.totalStars}`);
+
+// Chart historical data
+const history = data.snapshots.map(s => ({
+  date: new Date(s.timestamp),
+  stars: s.totalStars
+}));
+```
+
+### Importing to Databases
+
+```python
+import requests
+import json
+import sqlite3
+
+# Fetch data
+url = 'https://raw.githubusercontent.com/USERNAME/REPOSITORY/star-tracker-data/stars-data.json'
+response = requests.get(url)
+data = response.json()
+
+# Insert into database
+conn = sqlite3.connect('stars.db')
+cursor = conn.cursor()
+
+for snapshot in data['snapshots']:
+    cursor.execute(
+        'INSERT INTO snapshots (timestamp, total_stars) VALUES (?, ?)',
+        (snapshot['timestamp'], snapshot['totalStars'])
+    )
+
+conn.commit()
+conn.close()
+```
+
+## Troubleshooting
+
+### Data Branch Not Created
+
+- Verify the workflow has `contents: write` permission
+- Check workflow logs for errors
+- Ensure the first run completed successfully
+
+### Data Not Updating
+
+- Confirm workflow runs are successful
+- Check that star counts have actually changed
+- Review workflow logs for commit errors
+
+### Missing Charts
+
+- Verify `include-charts: true` in workflow
+- Ensure workflow completed without errors
+- Check `charts/` directory exists in data branch
+
+### Large Repository Size
+
+- Reduce `max-history` value
+- Disable charts with `include-charts: false`
+- Disable stargazer tracking
+- Prune old commits using git history rewriting (advanced)
+
+## Related Resources
+
+- [Embedding Charts Guide](/guides/embedding-charts)
+- [Workflow Setup](/guides/workflow-setup)
+- [API Reference - Outputs](/api/action-outputs)

@@ -1,0 +1,400 @@
+---
+title: Email Notifications
+description: Configure email notifications with SMTP, customize thresholds, and control when notifications are sent
+---
+
+GitHub Star Tracker can send email notifications with detailed reports about your star changes. This page covers how to set up SMTP and configure notification behavior.
+
+## Setup Overview
+
+To enable email notifications, you need to:
+
+1. Configure SMTP server settings
+2. Provide sender and recipient email addresses
+3. (Optional) Configure notification threshold
+
+<Note>
+  Email notifications are **optional**. If you don't provide SMTP settings, the action will still generate reports but won't send emails.
+</Note>
+
+## SMTP Configuration
+
+### Required SMTP Settings
+
+Provide these inputs to enable email notifications:
+
+<ParamField path="smtp-host" type="string" required>
+  SMTP server hostname.
+  
+  ```yaml
+  with:
+    smtp-host: smtp.gmail.com
+  ```
+</ParamField>
+
+<ParamField path="smtp-username" type="string" required>
+  SMTP authentication username (usually your email address).
+  
+  ```yaml
+  with:
+    smtp-username: ${{ secrets.SMTP_USERNAME }}
+  ```
+</ParamField>
+
+<ParamField path="smtp-password" type="string" required>
+  SMTP authentication password or app-specific password.
+  
+  ```yaml
+  with:
+    smtp-password: ${{ secrets.SMTP_PASSWORD }}
+  ```
+  
+  <Warning>
+    Always store SMTP credentials as GitHub secrets. Never commit them directly to your repository.
+  </Warning>
+</ParamField>
+
+<ParamField path="email-to" type="string" required>
+  Recipient email address.
+  
+  ```yaml
+  with:
+    email-to: [email protected]
+  ```
+</ParamField>
+
+### Optional SMTP Settings
+
+<ParamField path="smtp-port" type="number" default="587">
+  SMTP server port.
+  
+  Common ports:
+  - `587` - TLS/STARTTLS (recommended)
+  - `465` - SSL
+  - `25` - Unencrypted (not recommended)
+  
+  ```yaml
+  with:
+    smtp-port: 587
+  ```
+</ParamField>
+
+<ParamField path="email-from" type="string" default="GitHub Star Tracker">
+  Sender name or email address displayed in the "From" field.
+  
+  ```yaml
+  with:
+    email-from: Star Tracker <[email protected]>
+  ```
+</ParamField>
+
+## Provider-Specific Setup
+
+### Gmail
+
+For Gmail, you need to use an app-specific password:
+
+1. Enable 2-factor authentication on your Google account
+2. Generate an app password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+3. Use these settings:
+
+```yaml
+with:
+  smtp-host: smtp.gmail.com
+  smtp-port: 587
+  smtp-username: [email protected]
+  smtp-password: ${{ secrets.GMAIL_APP_PASSWORD }}
+  email-from: Your Name <[email protected]>
+  email-to: [email protected]
+```
+
+### Outlook / Office 365
+
+```yaml
+with:
+  smtp-host: smtp.office365.com
+  smtp-port: 587
+  smtp-username: [email protected]
+  smtp-password: ${{ secrets.OUTLOOK_PASSWORD }}
+  email-from: [email protected]
+  email-to: [email protected]
+```
+
+### SendGrid
+
+```yaml
+with:
+  smtp-host: smtp.sendgrid.net
+  smtp-port: 587
+  smtp-username: apikey
+  smtp-password: ${{ secrets.SENDGRID_API_KEY }}
+  email-from: [email protected]
+  email-to: [email protected]
+```
+
+### AWS SES
+
+```yaml
+with:
+  smtp-host: email-smtp.us-east-1.amazonaws.com
+  smtp-port: 587
+  smtp-username: ${{ secrets.AWS_SMTP_USERNAME }}
+  smtp-password: ${{ secrets.AWS_SMTP_PASSWORD }}
+  email-from: [email protected]
+  email-to: [email protected]
+```
+
+### Mailgun
+
+```yaml
+with:
+  smtp-host: smtp.mailgun.org
+  smtp-port: 587
+  smtp-username: [email protected]
+  smtp-password: ${{ secrets.MAILGUN_PASSWORD }}
+  email-from: [email protected]
+  email-to: [email protected]
+```
+
+## Notification Thresholds
+
+Control when notifications are sent based on star changes using the `notification-threshold` option.
+
+### Threshold Options
+
+<Tabs>
+  <Tab title="auto (Recommended)">
+    Adaptive threshold based on your repository activity and history.
+    
+    ```yaml
+    with:
+      notification-threshold: auto
+    ```
+    
+    The `auto` mode intelligently determines when changes are significant enough to notify you, taking into account:
+    - Total number of stars across your repositories
+    - Historical star change patterns
+    - Repository growth trends
+    
+    This is the **default** and **recommended** setting for most users.
+  </Tab>
+  
+  <Tab title="0 (Always Notify)">
+    Send notifications on every run, regardless of changes.
+    
+    ```yaml
+    with:
+      notification-threshold: 0
+    ```
+    
+    Useful for testing or when you want to receive reports on every scheduled run.
+  </Tab>
+  
+  <Tab title="Fixed Number">
+    Send notification only when stars change by at least this amount.
+    
+    ```yaml
+    with:
+      notification-threshold: 5
+    ```
+    
+    Example: Setting `5` means you'll only receive notifications when you gain or lose 5 or more stars total.
+  </Tab>
+</Tabs>
+
+### Send on No Changes
+
+By default, emails are only sent when star counts change. You can override this:
+
+```yaml
+with:
+  send-on-no-changes: true
+```
+
+When enabled:
+- Emails are sent even when no stars have changed
+- Useful for periodic status reports
+- The report will indicate "no changes" in the summary
+
+<Info>
+  The `send-on-no-changes` option is independent of `notification-threshold`. Even with a threshold, if no changes occur and this option is enabled, you'll receive an email.
+</Info>
+
+## Email Content
+
+Emails include:
+
+- **Subject line**: Localized subject with total stars and change delta
+- **HTML report**: Formatted report with:
+  - Summary of star changes
+  - Repository breakdown
+  - Star trend charts (if `include-charts: true`)
+  - New and removed repositories
+  - Individual repository trends
+  - New stargazers (if `track-stargazers: true`)
+  - Growth forecast
+
+### Subject Line Format
+
+The email subject follows this pattern:
+
+```
+GitHub Star Tracker Report: 1,234 stars (+12)
+```
+
+The format is localized based on your `locale` setting:
+
+- **English**: `GitHub Star Tracker Report: {total} ({delta})`
+- **Spanish**: `Informe de Seguimiento de Estrellas en GitHub: {total} ({delta})`
+- **Catalan**: `Informe de Seguiment d'Estrelles a GitHub: {total} ({delta})`
+- **Italian**: `Report Tracciamento Stelle GitHub: {total} ({delta})`
+
+## Complete Examples
+
+### Basic Email Notifications
+
+```yaml .github/workflows/star-tracker.yml
+name: Track Stars with Email
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Track stars
+        uses: ferranbuireu/github-star-tracker@v2
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          
+          # SMTP Configuration
+          smtp-host: smtp.gmail.com
+          smtp-port: 587
+          smtp-username: ${{ secrets.SMTP_USERNAME }}
+          smtp-password: ${{ secrets.SMTP_PASSWORD }}
+          email-to: [email protected]
+          email-from: GitHub Stars
+          
+          # Notification settings
+          notification-threshold: auto
+```
+
+### Advanced Notifications with Custom Threshold
+
+```yaml .github/workflows/star-tracker.yml
+name: Track Stars - High Activity
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Track stars
+        uses: ferranbuireu/github-star-tracker@v2
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          
+          # Repository filters
+          visibility: public
+          min-stars: 10
+          
+          # SMTP Configuration
+          smtp-host: smtp.sendgrid.net
+          smtp-port: 587
+          smtp-username: apikey
+          smtp-password: ${{ secrets.SENDGRID_API_KEY }}
+          email-to: [email protected]
+          email-from: Popular Repos <[email protected]>
+          
+          # Notification settings
+          notification-threshold: 10  # Only notify for 10+ star changes
+          send-on-no-changes: false
+          
+          # Report settings
+          include-charts: true
+          locale: en
+          track-stargazers: true
+```
+
+### Multiple Recipients (Using SendGrid)
+
+For multiple recipients, you'll need to use a service that supports comma-separated addresses or set up distribution lists:
+
+```yaml
+with:
+  smtp-host: smtp.sendgrid.net
+  smtp-port: 587
+  smtp-username: apikey
+  smtp-password: ${{ secrets.SENDGRID_API_KEY }}
+  email-from: [email protected]
+  email-to: [email protected],[email protected]  # Multiple recipients
+```
+
+## Troubleshooting
+
+### Email Not Sending
+
+1. **Check credentials**: Verify SMTP username and password are correct
+2. **Check port**: Ensure you're using the correct port (587 for TLS)
+3. **Check logs**: Review the GitHub Actions logs for error messages
+4. **Test SMTP**: Use a tool like `telnet` or `openssl` to test SMTP connectivity
+5. **App passwords**: For Gmail and some providers, ensure you're using app-specific passwords
+
+### Authentication Errors
+
+- **Gmail**: Must use app password with 2FA enabled
+- **Office 365**: May need to enable SMTP AUTH
+- **AWS SES**: Must verify sending domain/email first
+
+### Notifications Not Triggering
+
+If SMTP is working but you're not receiving emails:
+
+1. **Check threshold**: Your `notification-threshold` might be too high
+2. **No changes**: Enable `send-on-no-changes: true` to test
+3. **Check should-notify output**: Review the action outputs in logs
+
+## Security Best Practices
+
+<Warning>
+  **Never commit credentials directly to your repository!**
+</Warning>
+
+1. **Use GitHub Secrets**: Store all SMTP credentials as repository secrets
+2. **Use app passwords**: Enable 2FA and use app-specific passwords when available
+3. **Limit token scope**: Use the minimum required GitHub token scope
+4. **Review access**: Regularly review who has access to your secrets
+5. **Rotate credentials**: Periodically update SMTP passwords and tokens
+
+### Setting Up Secrets
+
+1. Go to your repository Settings > Secrets and variables > Actions
+2. Click "New repository secret"
+3. Add these secrets:
+   - `PAT_TOKEN` - Your GitHub Personal Access Token
+   - `SMTP_USERNAME` - Your SMTP username
+   - `SMTP_PASSWORD` - Your SMTP password or app password
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Localization" icon="globe" href="/configuration/localization">
+    Configure language preferences for email reports
+  </Card>
+  <Card title="Action Inputs" icon="code" href="/configuration/inputs">
+    View all available configuration options
+  </Card>
+</CardGroup>

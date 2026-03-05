@@ -1,0 +1,405 @@
+---
+title: Known Limitations
+description: Current constraints and workarounds for GitHub Star Tracker
+icon: triangle-exclamation
+---
+
+This page documents the known limitations of GitHub Star Tracker and provides workarounds where possible.
+
+## GitHub API Limitations
+
+### Rate Limits
+
+**Constraint:**
+GitHub enforces API rate limits that may affect execution:
+
+- **Authenticated requests**: 5,000 requests per hour
+- **Unauthenticated requests**: 60 requests per hour
+
+**Impact:**
+- Typical usage (without stargazer tracking): 1-5 API requests per run
+- With stargazer tracking: 1-5 + (1 per repository) API requests
+- Users with 100+ repositories and stargazer tracking enabled may approach rate limits if running very frequently
+
+**Workaround:**
+1. Disable stargazer tracking if not needed:
+   ```yaml
+   track-stargazers: false
+   ```
+
+2. Run less frequently:
+   ```yaml
+   on:
+     schedule:
+       - cron: '0 0 * * 0'  # Weekly instead of daily
+   ```
+
+3. Reduce the number of tracked repositories:
+   ```yaml
+   min-stars: '10'  # Only track popular repos
+   ```
+
+<Note>
+  In practice, rate limits are rarely hit with normal usage patterns. Most users stay well under 100 requests per run.
+</Note>
+
+### Stargazer History Limitation
+
+**Constraint:**
+GitHub's API only provides access to the **current** list of stargazers, not historical stargazers.
+
+**Impact:**
+- You can only see new stargazers **since the last run**
+- If someone stars and unstars between runs, they won't appear in reports
+- No way to recover stargazers from before you started tracking
+
+**Workaround:**
+- Run the action frequently (daily or more) to minimize gaps
+- Accept this as an inherent limitation of the GitHub API
+
+### Repository Count Pagination
+
+**Constraint:**
+Fetching repositories is paginated (100 per page).
+
+**Impact:**
+- Users with 1,000+ repositories will require 10+ API requests just to list all repos
+- Slightly slower execution for users with many repositories
+
+**Workaround:**
+- Use filtering to reduce the number of repositories:
+  ```yaml
+  visibility: 'public'  # Exclude private repos
+  min-stars: '5'        # Only track repos with engagement
+  include-archived: false
+  include-forks: false
+  ```
+
+## Token Limitations
+
+### Default GITHUB_TOKEN Not Supported
+
+**Constraint:**
+The default `GITHUB_TOKEN` provided by GitHub Actions cannot access repositories outside the current repository.
+
+**Impact:**
+- You **must** create a Personal Access Token (PAT)
+- Additional setup step required
+
+**Why this limitation exists:**
+GitHub's default token is scoped to only the repository where the workflow runs, for security reasons. Querying all your repositories requires broader permissions.
+
+**Solution:**
+Create a PAT with appropriate scope:
+- Classic: `repo` or `public_repo`
+- Fine-grained: Repository access with Contents + Metadata read permissions
+
+See [Authentication](/guides/personal-access-token) for detailed setup.
+
+### Organization Repository Access
+
+**Constraint:**
+Fine-grained tokens may have limited organization access.
+
+**Impact:**
+- Some organizations don't support fine-grained tokens yet
+- Fine-grained tokens require explicit organization approval
+- Classic tokens may be required for some enterprise setups
+
+**Workaround:**
+- Use Classic PAT with `repo` scope for organization repositories
+- Request organization admin to approve fine-grained token access
+
+## Data Storage Limitations
+
+### Git Branch Storage
+
+**Constraint:**
+Historical data is stored in a Git branch, which has some limitations:
+
+- Maximum practical size: ~50 MB (GitHub's repository size recommendations)
+- All data is version-controlled (no selective deletion)
+- Branch must be publicly accessible for badge embedding
+
+**Impact:**
+- Users with **thousands** of repositories and extended history (100+ snapshots) might approach practical size limits
+- Typical user with 50 repositories and 52 snapshots: < 2 MB
+
+**Workaround:**
+1. Reduce history retention:
+   ```yaml
+   max-history: '26'  # 6 months instead of 1 year
+   ```
+
+2. Disable stargazer tracking (larger data footprint):
+   ```yaml
+   track-stargazers: false
+   ```
+
+3. Filter repositories:
+   ```yaml
+   min-stars: '10'
+   ```
+
+### Private Repository Badge Embedding
+
+**Constraint:**
+Badges and charts from private repository data branches cannot be embedded in public locations (external sites, public repos).
+
+**Impact:**
+- SVG badges/charts won't render if the data branch is private
+- Can only be viewed within the same private repository
+
+**Workaround:**
+1. Make the data branch repository public (while keeping source code private)
+2. Host charts externally (e.g., upload to a public CDN)
+3. Use outputs to post data to external services instead of embedding
+
+## Feature Limitations
+
+### Stargazer Historical Tracking
+
+**Constraint:**
+No built-in way to track **when** specific users starred your repository in the past.
+
+**Impact:**
+- Only detects new stargazers since last run
+- No historical timeline of individual stars
+- Cannot build a "who starred when" timeline retroactively
+
+**Workaround:**
+- Start tracking as early as possible to build history going forward
+- Use GitHub's built-in Insights > Traffic for some historical data (limited retention)
+
+### No Unstar Detection
+
+**Constraint:**
+The action cannot definitively identify **who** unstarred a repository.
+
+**Impact:**
+- Reports show "Lost Stars: 5" but not which users
+- Can infer from stargazer list changes, but not 100% reliable
+
+**Why:**
+GitHub API provides current stargazers, not a diff from previous state.
+
+**Workaround:**
+- Accept aggregate unstar counts as sufficient
+- Run very frequently (hourly) to narrow down timeframe
+
+### Chart Customization
+
+**Constraint:**
+Chart appearance is pre-defined and cannot be fully customized.
+
+**Impact:**
+- Fixed color schemes (dark/light mode)
+- Fixed chart dimensions and layouts
+- No custom chart types beyond the three provided
+
+**Workaround:**
+1. Use CSV/JSON outputs to generate custom charts:
+   ```yaml
+   - uses: fbuireu/github-star-tracker@v1
+     id: tracker
+   
+   - name: Generate Custom Chart
+     run: |
+       echo '${{ steps.tracker.outputs.report-csv }}' > data.csv
+       # Use your preferred charting tool
+   ```
+
+2. Request features via [feature request](https://github.com/fbuireu/github-star-tracker/issues/new?template=feature_request.yml)
+
+### Language Support
+
+**Constraint:**
+Only 4 languages are currently supported:
+- English (en)
+- Spanish (es)
+- Catalan (ca)
+- Italian (it)
+
+**Impact:**
+Users preferring other languages will see English by default.
+
+**Workaround:**
+Contribute translations! See [Contributing](/contributing) for how to add new languages.
+
+## Workflow Limitations
+
+### Execution Time
+
+**Constraint:**
+Workflows may take several minutes to complete, especially with stargazer tracking enabled.
+
+**Typical execution times:**
+- Without stargazer tracking: 1-2 minutes
+- With stargazer tracking (50 repos): 3-5 minutes
+- With stargazer tracking (100+ repos): 5-10 minutes
+
+**Impact:**
+- Consumes GitHub Actions minutes
+- May timeout on free tier if you have hundreds of repositories with stargazer tracking
+
+**Workaround:**
+```yaml
+track-stargazers: false  # Much faster
+top-repos: '5'           # Fewer charts to generate
+```
+
+### Scheduling Precision
+
+**Constraint:**
+GitHub Actions scheduled workflows may have **up to 10-15 minute delays** during high-load periods.
+
+**Impact:**
+- Workflow won't run at exactly the scheduled time
+- May not run at all if GitHub Actions is experiencing issues
+
+**Workaround:**
+- Accept approximate scheduling (not critical for star tracking)
+- Use `workflow_dispatch` for manual triggering when needed
+
+### Concurrent Runs
+
+**Constraint:**
+Multiple runs of the same workflow can conflict when writing to the data branch.
+
+**Impact:**
+If manually triggered while scheduled run is in progress, one may fail with a merge conflict.
+
+**Workaround:**
+Add concurrency control:
+```yaml
+concurrency:
+  group: star-tracker
+  cancel-in-progress: true  # Cancel previous run if new one starts
+```
+
+## Platform Limitations
+
+### GitHub Enterprise Server (GHES)
+
+**Constraint:**
+Some features may not be available on older GHES versions.
+
+**Requirements:**
+- GHES 3.0 or later recommended
+- API compatibility varies by version
+
+**Impact:**
+- Older GHES installations may have missing API endpoints
+- Some newer GitHub features may not be available
+
+**Workaround:**
+- Upgrade GHES to latest version
+- Contact maintainers if specific issues arise on your GHES version
+
+### Self-Hosted Runners
+
+**Constraint:**
+Self-hosted runners require Node.js 24+.
+
+**Impact:**
+Older self-hosted runners may not have compatible Node.js version.
+
+**Workaround:**
+```yaml
+jobs:
+  track:
+    runs-on: ubuntu-latest  # Use GitHub-hosted runner
+```
+
+Or upgrade Node.js on self-hosted runners:
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+## Email Limitations
+
+### SMTP Authentication
+
+**Constraint:**
+Some email providers have strict security requirements.
+
+**Impact:**
+- Gmail requires App Passwords (not account password)
+- Corporate email servers may block external SMTP
+- 2FA-enabled accounts need special configuration
+
+**Workaround:**
+1. **Gmail**: Use [App Passwords](https://support.google.com/accounts/answer/185833)
+2. **Corporate email**: Use external SMTP relay services
+3. **Alternative**: Use GitHub Actions notification actions instead of built-in SMTP
+
+See [Email Notifications](/guides/email-notifications) for provider-specific guides.
+
+### HTML Email Rendering
+
+**Constraint:**
+Some email clients strip HTML styles and images.
+
+**Impact:**
+- Plain text fallback may not be as visually appealing
+- Images from private repositories won't load
+
+**Workaround:**
+- Accept plain text rendering in strict email clients
+- Use markdown output for better plain text experience
+
+## Security Limitations
+
+### Token Storage
+
+**Constraint:**
+PAT tokens must be stored as repository secrets.
+
+**Impact:**
+- Anyone with repository admin access can view/modify secrets
+- Tokens cannot be scoped to specific workflows
+
+**Workaround:**
+- Use fine-grained PATs with minimal permissions
+- Regularly rotate tokens
+- Use organization-level secrets for shared access control
+
+See [Security Policy](/security) for best practices.
+
+### Data Privacy
+
+**Constraint:**
+Data stored in public repository branches is publicly accessible.
+
+**Impact:**
+- Star counts and stargazer lists are public if data branch is public
+- Cannot embed badges from private repositories externally
+
+**Workaround:**
+- Keep entire repository private if you need private star tracking
+- Only track public repositories if privacy is a concern
+- Use `track-stargazers: false` to avoid storing user information
+
+## Future Improvements
+
+Many of these limitations are being considered for future releases. To request improvements:
+
+<CardGroup cols={2}>
+  <Card title="Feature Requests" icon="lightbulb" href="https://github.com/fbuireu/github-star-tracker/issues/new?template=feature_request.yml">
+    Suggest new features or improvements
+  </Card>
+  <Card title="Discussions" icon="comments" href="https://github.com/fbuireu/github-star-tracker/discussions">
+    Discuss ideas with the community
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/contributing">
+    Help build new features
+  </Card>
+  <Card title="Roadmap" icon="map" href="https://github.com/fbuireu/github-star-tracker/issues">
+    See planned features and priorities
+  </Card>
+</CardGroup>
+
+<Note>
+  Despite these limitations, GitHub Star Tracker works well for the vast majority of use cases. Most limitations only affect edge cases or very large-scale users.
+</Note>

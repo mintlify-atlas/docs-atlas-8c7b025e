@@ -1,0 +1,424 @@
+---
+title: Localization
+description: Configure language preferences for reports, emails, and output formatting
+---
+
+GitHub Star Tracker supports multiple languages for reports and email notifications. All text, including charts, badges, and email content, is localized based on your configuration.
+
+## Available Languages
+
+The following languages are currently supported:
+
+<CardGroup cols={2}>
+  <Card title="English" icon="flag-usa">
+    **Code:** `en`
+    
+    **Locale:** `en-US`
+    
+    Default language
+  </Card>
+  
+  <Card title="Spanish" icon="flag">
+    **Code:** `es`
+    
+    **Locale:** `es-ES`
+    
+    Español
+  </Card>
+  
+  <Card title="Catalan" icon="flag">
+    **Code:** `ca`
+    
+    **Locale:** `ca-ES`
+    
+    Català
+  </Card>
+  
+  <Card title="Italian" icon="flag">
+    **Code:** `it`
+    
+    **Locale:** `it-IT`
+    
+    Italiano
+  </Card>
+</CardGroup>
+
+## Configuration
+
+Set the language using the `locale` input:
+
+<CodeGroup>
+```yaml Action Input
+with:
+  locale: es
+```
+
+```yaml Configuration File
+locale: es
+```
+</CodeGroup>
+
+### Default Behavior
+
+If you specify an invalid locale, the action will:
+1. Log a warning message
+2. Fall back to English (`en`)
+
+From `src/config/loader.ts:86-89`:
+
+```typescript
+const locale = inputLocale || fileConfig.locale || DEFAULTS.locale;
+if (!isValidLocale(locale)) {
+  core.warning(`Invalid locale "${locale}". Falling back to "en"`);
+}
+```
+
+## Localized Content
+
+The following content is localized:
+
+### Reports
+
+- Section headings (Summary, Repositories, Trends, etc.)
+- Star change descriptions ("stars gained", "stars lost", "net change")
+- Trend indicators ("up", "down", "stable")
+- Repository status badges ("NEW", "REMOVED")
+- Chart titles and labels
+- Forecast section headings and predictions
+- Stargazer information
+
+### Email Notifications
+
+- Email subject line
+- Email body content (HTML formatted)
+- Sender default name
+
+### Badges
+
+- Badge text ("Total Stars")
+
+### Charts
+
+- Axis labels
+- Legend text
+- Chart titles
+
+## Language Examples
+
+### English (en)
+
+```markdown
+## Summary
+
+- Stars gained: 12
+- Stars lost: 3
+- Net change: +9
+
+## Repositories
+
+| Repository | Stars | Change | Trend |
+|------------|-------|--------|-------|
+| my-repo    | 156   | +5     | up    |
+```
+
+Email subject: `GitHub Star Tracker Report: 1,234 stars (+12)`
+
+### Spanish (es)
+
+```markdown
+## Resumen
+
+- Estrellas ganadas: 12
+- Estrellas perdidas: 3
+- Cambio neto: +9
+
+## Repositorios
+
+| Repositorio | Estrellas | Cambio | Tendencia |
+|-------------|-----------|--------|-----------||
+| my-repo     | 156       | +5     | subiendo  |
+```
+
+Email subject: `Informe de Seguimiento de Estrellas en GitHub: 1,234 estrellas (+12)`
+
+### Catalan (ca)
+
+```markdown
+## Resum
+
+- Estrelles guanyades: 12
+- Estrelles perdudes: 3
+- Canvi net: +9
+
+## Repositoris
+
+| Repositori | Estrelles | Canvi | Tendència |
+|------------|-----------|-------|-----------||
+| my-repo    | 156       | +5    | pujant    |
+```
+
+Email subject: `Informe de Seguiment d'Estrelles a GitHub: 1,234 estrelles (+12)`
+
+### Italian (it)
+
+```markdown
+## Riepilogo
+
+- Stelle guadagnate: 12
+- Stelle perse: 3
+- Variazione netta: +9
+
+## Repository
+
+| Repository | Stelle | Variazione | Tendenza      |
+|------------|--------|------------|---------------|
+| my-repo    | 156    | +5         | in aumento    |
+```
+
+Email subject: `Report Tracciamento Stelle GitHub: 1,234 stelle (+12)`
+
+## Translation Keys
+
+The translation system uses JSON files located in `src/i18n/`. Here are the key categories:
+
+### Badge Translations
+
+```json
+{
+  "badge": {
+    "totalStars": "Total Stars"
+  }
+}
+```
+
+### Report Translations
+
+```json
+{
+  "report": {
+    "title": "Star Tracker Report",
+    "total": "Total",
+    "change": "Change",
+    "comparedTo": "Compared to snapshot from {date}",
+    "firstRun": "first run",
+    "repositories": "Repositories",
+    "stars": "Stars",
+    "starsCount": "{count} stars",
+    "trend": "Trend",
+    "newRepositories": "New Repositories",
+    "removedRepositories": "Removed Repositories",
+    "summary": "Summary",
+    "starsGained": "Stars gained",
+    "starsLost": "Stars lost",
+    "netChange": "Net change"
+  }
+}
+```
+
+### Email Translations
+
+```json
+{
+  "email": {
+    "subject": "GitHub Star Tracker Report",
+    "subjectLine": "{subject}: {totalStars} ({delta})",
+    "defaultFrom": "GitHub Star Tracker"
+  }
+}
+```
+
+### Trend Translations
+
+```json
+{
+  "trends": {
+    "up": "up",
+    "down": "down",
+    "stable": "stable"
+  }
+}
+```
+
+### Stargazer Translations
+
+```json
+{
+  "stargazers": {
+    "sectionTitle": "New Stargazers",
+    "newStargazers": "{count} new stargazers since last run",
+    "starredOn": "starred on {date}",
+    "noNewStargazers": "No new stargazers since last run"
+  }
+}
+```
+
+### Forecast Translations
+
+```json
+{
+  "forecast": {
+    "sectionTitle": "Growth Forecast",
+    "predictedStars": "Predicted Stars",
+    "week": "Week {n}",
+    "linearRegression": "Linear Regression",
+    "weightedMovingAverage": "Weighted Moving Average",
+    "aggregate": "Aggregate Forecast",
+    "insufficientData": "Not enough data for forecast (need at least 3 snapshots)"
+  }
+}
+```
+
+## String Interpolation
+
+Translations support variable interpolation using `{variable}` syntax:
+
+```json
+{
+  "starsCount": "{count} stars",
+  "comparedTo": "Compared to snapshot from {date}",
+  "subjectLine": "{subject}: {totalStars} ({delta})"
+}
+```
+
+From `src/i18n/index.ts:17-21`:
+
+```typescript
+export function interpolate({ template, params }: InterpolateParams): string {
+  return template.replaceAll(PLACEHOLDER_PATTERN, (match, key) =>
+    key in params ? String(params[key]) : match,
+  );
+}
+```
+
+## Workflow Examples
+
+### Spanish Reports
+
+```yaml .github/workflows/star-tracker-es.yml
+name: Seguimiento de Estrellas
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Seguir estrellas
+        uses: ferranbuireu/github-star-tracker@v2
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          locale: es
+          
+          smtp-host: smtp.gmail.com
+          smtp-username: ${{ secrets.SMTP_USERNAME }}
+          smtp-password: ${{ secrets.SMTP_PASSWORD }}
+          email-to: [email protected]
+          email-from: Seguimiento de Estrellas
+```
+
+### Catalan Configuration File
+
+```yaml star-tracker.yml
+# Configuració en català
+visibility: public
+include_archived: false
+include_forks: false
+min_stars: 5
+
+locale: ca
+include_charts: true
+top_repos: 10
+```
+
+### Italian with Notifications
+
+```yaml .github/workflows/star-tracker-it.yml
+name: Tracciamento Stelle
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Traccia stelle
+        uses: ferranbuireu/github-star-tracker@v2
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          locale: it
+          
+          smtp-host: smtp.gmail.com
+          smtp-username: ${{ secrets.SMTP_USERNAME }}
+          smtp-password: ${{ secrets.SMTP_PASSWORD }}
+          email-to: [email protected]
+          email-from: Tracciamento Stelle GitHub
+```
+
+## Adding New Languages
+
+To contribute a new language translation:
+
+1. Create a new JSON file in `src/i18n/` (e.g., `fr.json` for French)
+2. Copy the structure from `en.json` and translate all strings
+3. Add the locale to `LOCALE_MAP` in `src/config/defaults.ts`:
+
+```typescript
+export const LOCALE_MAP = {
+  en: 'en-US',
+  es: 'es-ES',
+  ca: 'ca-ES',
+  it: 'it-IT',
+  fr: 'fr-FR',  // New language
+} as const;
+```
+
+4. Import and add to `TRANSLATIONS` in `src/i18n/index.ts`:
+
+```typescript
+import fr from './fr.json';
+
+const TRANSLATIONS: Record<Locale, Translations> = { en, es, ca, it, fr };
+```
+
+5. Submit a pull request!
+
+<Tip>
+  Contributions for additional languages are welcome! See the [CONTRIBUTING.md](https://github.com/ferranbuireu/github-star-tracker/blob/main/CONTRIBUTING.md) guide.
+</Tip>
+
+## Implementation Details
+
+The localization system is implemented in `src/i18n/index.ts`:
+
+```typescript
+export function getTranslations(locale: Locale): Translations {
+  return TRANSLATIONS[locale] || FALLBACK_LANG;
+}
+
+export function isValidLocale(value: string): value is Locale {
+  return LOCALES.includes(value as Locale);
+}
+```
+
+Valid locales are: `en`, `es`, `ca`, `it`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration Overview" icon="gear" href="/configuration/overview">
+    Learn about all configuration options
+  </Card>
+  <Card title="Notifications" icon="bell" href="/configuration/notifications">
+    Set up email notifications in your language
+  </Card>
+</CardGroup>

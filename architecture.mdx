@@ -1,0 +1,496 @@
+---
+title: Architecture
+description: Explore the layered architecture, design patterns, and technical implementation of GitHub Star Tracker
+---
+
+GitHub Star Tracker follows a **clean architecture** pattern with clear separation between domain logic, infrastructure concerns, and presentation layers.
+
+## Architectural Layers
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Presentation Layer                      │
+│  (/presentation)                                        │
+│  - Markdown, HTML, CSV report generators               │
+│  - SVG badge and chart renderers                       │
+│  - Internationalized formatting                         │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                  Application Layer                      │
+│  (/application)                                         │
+│  - Main orchestrator (trackStars)                      │
+│  - Workflow coordination                                │
+│  - Output management                                    │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                   Domain Layer                          │
+│  (/domain)                                              │
+│  - Business logic (comparison, forecast, notification) │
+│  - Core types and data models                          │
+│  - Pure functions, no external dependencies            │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│               Infrastructure Layer                      │
+│  (/infrastructure)                                      │
+│  - GitHub API client (REST API)                        │
+│  - Git operations (worktree, commit, push)             │
+│  - File I/O (JSON, CSV, SVG persistence)               │
+│  - SMTP email delivery                                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Layer Responsibilities
+
+<AccordionGroup>
+  <Accordion title="Domain Layer (/src/domain)">
+    Contains **pure business logic** with no external dependencies. All functions are deterministic and easily testable.
+
+    ### Key Modules
+
+    **`comparison.ts`** - Star delta computation
+    ```typescript
+    export function compareStars({
+      currentRepos,
+      previousSnapshot,
+    }: CompareStarsParams): ComparisonResults {
+      // Builds maps of current vs previous star counts
+      // Identifies new repos, removed repos, and deltas
+      // Returns ComparisonResults with per-repo and aggregate metrics
+    }
+    ```
+
+    **`snapshot.ts`** - Snapshot management
+    ```typescript
+    export function getLastSnapshot(history: History): Snapshot | null;
+    export function addSnapshot({ history, snapshot, maxHistory }: AddSnapshotParams): History;
+    ```
+
+    **`forecast.ts`** - Growth prediction
+    ```typescript
+    export function computeForecast({
+      history,
+      topRepoNames,
+    }: ComputeForecastParams): ForecastData | null {
+      // Requires at least 3 snapshots
+      // Applies linear regression and weighted moving average
+      // Forecasts 4 weeks ahead
+    }
+    ```
+
+    **`stargazers.ts`** - Stargazer diffing
+    ```typescript
+    export function diffStargazers({
+      current,
+      previousMap,
+    }: DiffStargazersParams): StargazerDiffResult {
+      // Identifies new stargazers per repository
+      // Returns sorted list by starred_at timestamp
+    }
+    ```
+
+    **`notification.ts`** - Threshold logic
+    ```typescript
+    export function shouldNotify({
+      totalStars,
+      starsAtLastNotification,
+      threshold,
+    }: ShouldNotifyParams): boolean {
+      // Supports fixed thresholds (N stars)
+      // Supports adaptive thresholds ('auto' mode)
+      // Adaptive: 1% for <1000 stars, 0.5% for 1000-10000, 0.1% for >10000
+    }
+    ```
+
+    **`types.ts`** - Core data models
+    ```typescript
+    interface RepoInfo {
+      owner: string;
+      name: string;
+      fullName: string;
+      private: boolean;
+      archived: boolean;
+      fork: boolean;
+      stars: number;
+    }
+
+    interface Snapshot {
+      timestamp: string;
+      totalStars: number;
+      repos: SnapshotRepo[];
+    }
+
+    interface Summary {
+      totalStars: number;
+      totalPrevious: number;
+      totalDelta: number;
+      newStars: number;
+      lostStars: number;
+      changed: boolean;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Infrastructure Layer (/src/infrastructure)">
+    Handles all external interactions: GitHub API, Git operations, file I/O, and email delivery.
+
+    ### Key Modules
+
+    **`github/filters.ts`** - Repository filtering
+    ```typescript
+    export async function getRepos({ octokit, config }: GetReposParams): Promise<RepoInfo[]> {
+      const allRepos = await fetchRepos({ octokit, config });
+      const filtered = filterRepos({ repos: allRepos, config });
+      return mapRepos(filtered);
+    }
+    ```
+
+    Filter criteria:
+    - `visibility`: public, private, all, owned
+    - `includeArchived`: boolean
+    - `includeForks`: boolean
+    - `minStars`: minimum star threshold
+    - `excludeRepos`: regex or literal names
+    - `onlyRepos`: whitelist mode
+
+    **`github/stargazers.ts`** - Stargazer fetching
+    ```typescript
+    export async function fetchAllStargazers({
+      octokit,
+      repos,
+    }: FetchAllStargazersParams): Promise<RepoStargazers[]> {
+      // Paginates through stargazers endpoint
+      // Returns login, avatar, profile URL, and starred_at timestamp
+    }
+    ```
+
+    **`git/worktree.ts`** - Git worktree management
+    ```typescript
+    export function initializeDataBranch(dataBranch: string): string {
+      // Configures git user (github-actions[bot])
+      // Checks if branch exists on remote
+      // Creates orphan branch if needed
+      // Adds worktree in separate directory
+      return dataDir; // e.g., ".star-tracker-data"
+    }
+
+    export function cleanup(dataDir: string): void {
+      // Removes worktree after operations complete
+    }
+    ```
+
+    <Info>
+      Worktrees allow the action to work with two branches simultaneously without affecting the main checkout.
+    </Info>
+
+    **`persistence/storage.ts`** - File operations
+    ```typescript
+    export function readHistory(dataDir: string): History;
+    export function writeHistory({ dataDir, history }: WriteHistoryParams): void;
+    export function writeReport({ dataDir, markdown }: WriteReportParams): void;
+    export function writeBadge({ dataDir, svg }: WriteBadgeParams): void;
+    export function writeChart({ dataDir, filename, svg }: WriteChartParams): void;
+    export function writeCsv({ dataDir, csv }: WriteCsvParams): void;
+    export function readStargazers(dataDir: string): StargazerMap;
+    export function writeStargazers({ dataDir, stargazerMap }: WriteStargazersParams): void;
+    ```
+
+    **`persistence/storage.ts`** - Git commit and push
+    ```typescript
+    export function commitAndPush({
+      dataDir,
+      dataBranch,
+      message,
+    }: CommitAndPushParams): boolean {
+      // Stages all files with git add -A
+      // Checks for staged changes with git diff --cached --quiet
+      // Commits and pushes to origin/{dataBranch}
+      // Returns true if changes were committed
+    }
+    ```
+
+    **`notification/email.ts`** - SMTP delivery
+    ```typescript
+    export async function sendEmail({
+      emailConfig,
+      subject,
+      htmlBody,
+    }: SendEmailParams): Promise<void> {
+      // Uses nodemailer with SMTP transport
+      // Sends HTML report with inline styles
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Application Layer (/src/application)">
+    Orchestrates the entire workflow by coordinating domain logic and infrastructure.
+
+    **`tracker.ts`** - Main entry point
+    ```typescript
+    export async function trackStars(): Promise<void> {
+      const config = loadConfig();
+      const octokit = github.getOctokit(token, ...);
+      
+      const repos = await getRepos({ octokit, config });
+      
+      await withDataDir(config.dataBranch, async (dataDir) => {
+        const history = readHistory(dataDir);
+        const lastSnapshot = getLastSnapshot(history);
+        const results = compareStars({ currentRepos: repos, previousSnapshot: lastSnapshot });
+        
+        if (config.trackStargazers) {
+          const repoStargazers = await fetchAllStargazers({ octokit, repos });
+          // ... stargazer diffing logic
+        }
+        
+        const forecastData = computeForecast({ history, topRepoNames });
+        
+        // Generate all reports
+        const markdownReport = generateMarkdownReport({ ... });
+        const htmlReport = generateHtmlReport({ ... });
+        const csvReport = generateCsvReport(results);
+        const badge = generateBadge({ ... });
+        
+        // Generate charts
+        const svgChart = generateSvgChart({ ... });
+        // ... other charts
+        
+        // Persist everything
+        writeHistory({ dataDir, history: updatedHistory });
+        writeReport({ dataDir, markdown: markdownReport });
+        // ... other writes
+        
+        commitAndPush({ dataDir, dataBranch: config.dataBranch, message: commitMsg });
+        
+        setOutputs({ summary, markdownReport, htmlReport, csvReport, shouldNotify, newStargazers });
+        
+        // Email if configured
+        if (emailConfig && (notify || config.sendOnNoChanges)) {
+          await sendEmail({ emailConfig, subject, htmlBody: htmlReport });
+        }
+      });
+    }
+    ```
+
+    The `withDataDir` helper ensures worktree cleanup:
+    ```typescript
+    async function withDataDir(branch: string, fn: (dataDir: string) => Promise<void>): Promise<void> {
+      const dataDir = initializeDataBranch(branch);
+      try {
+        await fn(dataDir);
+      } finally {
+        cleanup(dataDir);
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Presentation Layer (/src/presentation)">
+    Transforms domain models into user-facing formats: Markdown, HTML, CSV, SVG.
+
+    ### Report Generators
+
+    **`markdown.ts`** - GitHub-flavored Markdown
+    ```typescript
+    export function generateMarkdownReport(params: GenerateReportParams): string {
+      // Renders summary table with delta indicators
+      // Embeds chart images from data branch
+      // Shows new/removed repos
+      // Includes stargazer details if enabled
+      // Displays forecast tables
+    }
+    ```
+
+    **`html.ts`** - Email-compatible HTML
+    ```typescript
+    export function generateHtmlReport(params: GenerateReportParams): string {
+      // Inline CSS for email client compatibility
+      // Responsive tables
+      // Delta indicators with color coding
+    }
+    ```
+
+    **`csv.ts`** - Machine-readable export
+    ```typescript
+    export function generateCsvReport(results: ComparisonResults): string {
+      // Columns: Repository, Stars, Previous, Delta, Status
+      // Status: New, Removed, Changed, Unchanged
+    }
+    ```
+
+    ### Visual Generators
+
+    **`badge.ts`** - Shields.io-style SVG badge
+    ```typescript
+    export function generateBadge({ totalStars, locale }: GenerateBadgeParams): string {
+      // Localized "stars" label
+      // Formatted star count (e.g., 1.2k, 1.5M)
+      // Blue color scheme
+    }
+    ```
+
+    **`svg-chart.ts`** - Animated charts with dark/light mode
+    ```typescript
+    export function generateSvgChart({ history, title, locale }: GenerateSvgChartParams): string | null;
+    export function generatePerRepoSvgChart({ history, repoFullName, locale }: PerRepoChartParams): string | null;
+    export function generateComparisonSvgChart({ history, repoNames, title, locale }: ComparisonChartParams): string | null;
+    export function generateForecastSvgChart({ history, forecastData, locale }: ForecastChartParams): string | null;
+    ```
+
+    Charts use:
+    - CSS variables for theming
+    - `@media (prefers-color-scheme: dark)` for automatic theme switching
+    - SVG animations for transitions
+    - Responsive viewBox scaling
+  </Accordion>
+</AccordionGroup>
+
+## Design Patterns
+
+<CardGroup cols={2}>
+  <Card title="Dependency Injection" icon="syringe">
+    Dependencies like `octokit`, `config`, and `dataDir` are passed explicitly rather than imported globally.
+
+    ```typescript
+    getRepos({ octokit, config })
+    compareStars({ currentRepos, previousSnapshot })
+    ```
+
+    This enables:
+    - Easy testing with mocks
+    - Clear function contracts
+    - No hidden dependencies
+  </Card>
+
+  <Card title="Pure Functions" icon="flask">
+    Domain logic uses pure functions with no side effects:
+
+    ```typescript
+    compareStars(): ComparisonResults
+    computeForecast(): ForecastData | null
+    shouldNotify(): boolean
+    ```
+
+    Benefits:
+    - Deterministic output
+    - Trivial to test
+    - Safe parallelization
+  </Card>
+
+  <Card title="Resource Management" icon="lock">
+    The `withDataDir` pattern ensures cleanup even on errors:
+
+    ```typescript
+    try {
+      await fn(dataDir);
+    } finally {
+      cleanup(dataDir);
+    }
+    ```
+
+    Prevents:
+    - Orphaned worktrees
+    - Disk space leaks
+    - Subsequent run failures
+  </Card>
+
+  <Card title="Separation of Concerns" icon="layer-group">
+    Each layer has a single responsibility:
+    - **Domain**: business rules
+    - **Infrastructure**: external I/O
+    - **Application**: orchestration
+    - **Presentation**: formatting
+
+    Changes to one layer rarely affect others.
+  </Card>
+</CardGroup>
+
+## Type Safety
+
+The codebase is written in **TypeScript** with strict mode enabled:
+
+```typescript
+interface CompareStarsParams {
+  currentRepos: RepoInfo[];
+  previousSnapshot: Snapshot | null;
+}
+
+interface GenerateReportParams {
+  results: ComparisonResults;
+  previousTimestamp: string | null;
+  locale: Locale;
+  history: History;
+  includeCharts: boolean;
+  stargazerDiff: StargazerDiffResult | null;
+  forecastData: ForecastData | null;
+  topRepos: number;
+}
+```
+
+Benefits:
+- Compile-time error detection
+- IDE autocomplete and inline docs
+- Refactoring safety
+- Self-documenting code
+
+## Testing Strategy
+
+The action has **95%+ test coverage** with 300+ tests:
+
+- **Unit tests**: All domain functions (comparison, forecast, notification)
+- **Integration tests**: GitHub API interactions, Git operations
+- **Snapshot tests**: Report and chart rendering
+
+Test file naming: `*.test.ts` adjacent to implementation files.
+
+## Internationalization
+
+Supports 4 languages: English, Spanish, Catalan, Italian.
+
+```typescript
+import { getTranslations } from '@i18n';
+
+const t = getTranslations(config.locale);
+const title = t.report.starHistory; // "Star History" or "Historial de Estrellas"
+```
+
+Translations are used in:
+- Markdown and HTML reports
+- SVG badges and charts
+- Email subject lines
+- Delta indicators
+
+## Performance Considerations
+
+<Info>
+  The action is optimized for low overhead and fast execution.
+</Info>
+
+**Bundled Dependencies**: Zero runtime npm installs. All dependencies are bundled at build time.
+
+**Git Worktrees**: Avoids expensive branch switches and stash operations.
+
+**Incremental Processing**: Only fetches stargazers if `track-stargazers: true`.
+
+**Efficient Pagination**: Uses GitHub's REST API with optimal page sizes.
+
+**Snapshot Rotation**: Limits history to `max-history` snapshots (default: 52) to prevent unbounded growth.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="How It Works" icon="gears" href="/how-it-works">
+    See the step-by-step execution pipeline
+  </Card>
+  <Card title="Outputs" icon="arrow-up-right-from-square" href="/outputs">
+    Learn about action outputs for workflow chaining
+  </Card>
+  <Card title="Technical Stack" icon="code" href="/architecture">
+    Explore the technologies and libraries used
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/contributing">
+    Contribute to the project
+  </Card>
+</CardGroup>

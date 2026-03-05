@@ -1,97 +1,121 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "GitHub Star Tracker"
+description: "Automatically track star count changes across your repositories with visual charts, email notifications, and historical reports"
 ---
 
-## Setting up
+<div className="flex flex-col items-center justify-center text-center py-12">
+  <div className="mb-8">
+    <h1 className="text-5xl font-bold mb-4">GitHub Star Tracker</h1>
+    <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+      A GitHub Action that automatically tracks star count changes across all your repositories on a schedule, generates visual reports with charts and badges, and sends notifications when changes are detected.
+    </p>
+  </div>
+  
+  <div className="flex gap-4 mb-12">
+    <a href="/quickstart" className="px-6 py-3 rounded-md font-semibold" style={{backgroundColor: '#238636', color: '#ffffff'}}>
+      Get Started
+    </a>
+    <a href="https://github.com/fbuireu/github-star-tracker" className="px-6 py-3 rounded-md font-semibold border" style={{borderColor: '#848c8e', color: '#ffffff'}}>
+      View on GitHub
+    </a>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+## Key Features
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Animated SVG Charts" icon="chart-line" href="/features/charts">
+    Star history, per-repo trends, comparisons, and growth forecasts with automatic dark/light mode support
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Smart Filtering" icon="filter" href="/configuration/filtering">
+    Filter repositories by visibility, ownership, min stars, regex exclusions, archived, and forks
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Stargazer Tracking" icon="users" href="/features/stargazer-tracking">
+    Track individual stargazers with avatars and timestamps to see who's starring your repos
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Email Notifications" icon="envelope" href="/guides/email-notifications">
+    Built-in SMTP with fixed or adaptive thresholds to notify you of star changes
   </Card>
-</Columns>
+  <Card title="Multi-language Support" icon="globe" href="/configuration/localization">
+    Reports and emails in English, Spanish, Catalan, and Italian
+  </Card>
+  <Card title="Shields.io Badges" icon="shield" href="/features/badges">
+    Embeddable star count badges that update automatically
+  </Card>
+  <Card title="Growth Forecasting" icon="chart-area" href="/features/forecasting">
+    AI-powered predictions of future star growth based on historical trends
+  </Card>
+  <Card title="Multiple Export Formats" icon="file-export" href="/features/reports">
+    CSV, JSON, Markdown, and HTML reports for dashboards and data pipelines
+  </Card>
+</CardGroup>
 
-## Create beautiful pages
+## What You Get
 
-Everything you need to create world-class documentation.
+Every run, Star Tracker commits these artifacts to a dedicated data branch:
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+- **Animated SVG charts** - Star history, per-repo trends, top repos comparison, and growth forecasts with automatic dark/light mode support
+- **Shields.io-style badge** - Embeddable star count that updates automatically
+- **Markdown & HTML reports** - Summary tables, delta indicators, new/removed repos, stargazer details, and forecast tables
+- **CSV & JSON data** - Machine-readable exports for dashboards, spreadsheets, or downstream pipelines
 
-## Need inspiration?
+## Quick Start
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Steps>
+  <Step title="Create a Personal Access Token">
+    Generate a classic token with `repo` or `public_repo` scope and add it as a repository secret named `GITHUB_STAR_TRACKER_TOKEN`
+    
+    <Note>The default `GITHUB_TOKEN` is not sufficient. See the [PAT guide](/guides/personal-access-token) for details.</Note>
+  </Step>
+  
+  <Step title="Add the Workflow">
+    Create `.github/workflows/star-tracker.yml` in your repository
+    
+    ```yaml
+    name: Track Stars
+    
+    on:
+      schedule:
+        - cron: '0 0 * * *' # Daily at midnight
+      workflow_dispatch:
+    
+    permissions:
+      contents: write
+    
+    jobs:
+      track:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: fbuireu/github-star-tracker@v1
+            with:
+              github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    ```
+  </Step>
+  
+  <Step title="Run and View">
+    Trigger a manual run from Actions tab or wait for the scheduled run. View the report in the `star-tracker-data` branch.
+  </Step>
+</Steps>
+
+## Documentation
+
+<CardGroup cols={3}>
+  <Card title="Getting Started" icon="rocket" href="/quickstart">
+    Set up Star Tracker in your repository
+  </Card>
+  <Card title="Configuration" icon="cog" href="/configuration/overview">
+    Configure filtering, notifications, and more
+  </Card>
+  <Card title="How It Works" icon="gears" href="/how-it-works">
+    Understand the execution flow and architecture
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/action-inputs">
+    Complete inputs, outputs, and data formats
+  </Card>
+  <Card title="Examples" icon="book" href="/examples">
+    Real-world workflow configurations
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

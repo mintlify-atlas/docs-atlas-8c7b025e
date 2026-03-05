@@ -1,0 +1,147 @@
+---
+title: Configuration Overview
+description: Learn how to configure GitHub Star Tracker using action inputs or a YAML configuration file
+---
+
+GitHub Star Tracker offers flexible configuration through two methods:
+
+1. **GitHub Action inputs** - Configure directly in your workflow file
+2. **YAML configuration file** - Use a separate config file for easier management
+
+## Configuration Priority
+
+Configuration values are resolved in the following order (highest to lowest priority):
+
+1. **Action inputs** - Values specified in your workflow's `with:` section
+2. **Configuration file** - Values from `star-tracker.yml` (or custom config path)
+3. **Default values** - Built-in defaults when no value is provided
+
+This means action inputs will always override configuration file settings, giving you flexibility to use a base configuration file while overriding specific values per workflow.
+
+## Quick Example
+
+### Using Action Inputs
+
+```yaml
+steps:
+  - name: Track stars
+    uses: ferranbuireu/github-star-tracker@v2
+    with:
+      github-token: ${{ secrets.PAT_TOKEN }}
+      visibility: public
+      include-forks: false
+      min-stars: 5
+      locale: en
+```
+
+### Using Configuration File
+
+Create `star-tracker.yml` in your repository root:
+
+```yaml
+visibility: public
+include_forks: false
+min_stars: 5
+locale: en
+```
+
+Then reference it in your workflow:
+
+```yaml
+steps:
+  - name: Track stars
+    uses: ferranbuireu/github-star-tracker@v2
+    with:
+      github-token: ${{ secrets.PAT_TOKEN }}
+      config-path: star-tracker.yml
+```
+
+## Configuration File Location
+
+By default, the action looks for `star-tracker.yml` in the root of your repository. You can specify a custom location:
+
+```yaml
+with:
+  config-path: .github/configs/star-tracker.yml
+```
+
+<Note>
+  The configuration file uses **snake_case** (e.g., `include_forks`), while action inputs use **kebab-case** (e.g., `include-forks`).
+</Note>
+
+## Configuration Categories
+
+Configuration options are organized into several categories:
+
+<CardGroup cols={2}>
+  <Card title="Inputs" icon="sliders" href="/configuration/inputs">
+    Core action inputs including GitHub authentication and config paths
+  </Card>
+  <Card title="Filtering" icon="filter" href="/configuration/filtering">
+    Control which repositories to track and which to exclude
+  </Card>
+  <Card title="Notifications" icon="bell" href="/configuration/notifications">
+    Configure email notifications and SMTP settings
+  </Card>
+  <Card title="Localization" icon="globe" href="/configuration/localization">
+    Set language preferences for reports and emails
+  </Card>
+</CardGroup>
+
+## Complete Example
+
+Here's a comprehensive configuration showing all available options:
+
+```yaml star-tracker.yml
+# Repository filtering
+visibility: all
+include_archived: false
+include_forks: false
+exclude_repos:
+  - old-repo
+  - /^test-.*/  # Regex pattern
+only_repos: []   # Leave empty to track all (respecting filters above)
+min_stars: 1
+
+# Data storage
+data_branch: star-tracker-data
+max_history: 52
+
+# Reports
+include_charts: true
+locale: en
+top_repos: 10
+track_stargazers: false
+
+# Notifications (optional)
+notification_threshold: auto
+```
+
+## Default Values
+
+When no configuration is provided, these defaults are used:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `visibility` | `all` | Track all repositories (public + private) |
+| `include_archived` | `false` | Exclude archived repositories |
+| `include_forks` | `false` | Exclude forked repositories |
+| `min_stars` | `0` | No minimum star threshold |
+| `data_branch` | `star-tracker-data` | Branch for storing tracking data |
+| `max_history` | `52` | Keep 52 snapshots (~1 year of weekly runs) |
+| `include_charts` | `true` | Generate SVG charts in reports |
+| `locale` | `en` | English language |
+| `notification_threshold` | `auto` | Adaptive notification threshold |
+| `top_repos` | `10` | Show top 10 repositories |
+| `track_stargazers` | `false` | Don't track individual stargazers |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Action Inputs" icon="code" href="/configuration/inputs">
+    View all available action inputs with detailed descriptions
+  </Card>
+  <Card title="Filtering Options" icon="filter" href="/configuration/filtering">
+    Learn how to filter repositories effectively
+  </Card>
+</CardGroup>

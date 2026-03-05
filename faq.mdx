@@ -1,0 +1,477 @@
+---
+title: FAQ
+description: Frequently asked questions about GitHub Star Tracker
+icon: messages-question
+---
+
+Answers to the most common questions about GitHub Star Tracker.
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="Why can't I use the default GITHUB_TOKEN?">
+    The default `GITHUB_TOKEN` provided by GitHub Actions has a limitation: it can only access the repository where the workflow is running.
+
+    GitHub Star Tracker needs to:
+    - Query **all your repositories** across your account or organization
+    - Access repository metadata and star counts
+    - Optionally fetch stargazer information
+
+    This requires a Personal Access Token (PAT) with broader permissions.
+
+    **Solution:** Create a [Personal Access Token](/guides/personal-access-token) with `repo` or `public_repo` scope.
+  </Accordion>
+
+  <Accordion title="How often should I run the workflow?">
+    **Recommended frequency:**
+    - **Daily** (most common): Good balance between freshness and API usage
+    - **Weekly**: For projects with slower growth
+    - **Hourly**: Only if you have very active repositories and need real-time tracking
+
+    **Example configurations:**
+
+    ```yaml
+    # Daily at midnight UTC
+    on:
+      schedule:
+        - cron: '0 0 * * *'
+    
+    # Weekly on Sunday
+    on:
+      schedule:
+        - cron: '0 0 * * 0'
+    
+    # Twice daily (8 AM and 8 PM UTC)
+    on:
+      schedule:
+        - cron: '0 8,20 * * *'
+    ```
+
+    <Note>
+      More frequent runs consume more GitHub Actions minutes and API requests.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Does this action count against my GitHub Actions minutes?">
+    Yes, like all GitHub Actions workflows, this counts against your monthly quota:
+
+    - **Free plan**: 2,000 minutes/month
+    - **Pro plan**: 3,000 minutes/month
+    - **Team plan**: 10,000 minutes/month
+    - **Enterprise**: 50,000 minutes/month
+
+    **Typical usage:**
+    - Without stargazer tracking: ~1-2 minutes per run
+    - With stargazer tracking: ~3-5 minutes per run
+
+    Running daily = ~30-150 minutes/month (less than 8% of free tier).
+
+    Public repositories get unlimited minutes.
+  </Accordion>
+
+  <Accordion title="Is my data private?">
+    **Data storage:**
+    - Historical data is stored in a Git branch (`star-tracker-data`) in your repository
+    - If your repository is **private**, so is the data branch
+    - If your repository is **public**, the data branch is also public
+
+    **What data is collected:**
+    - Repository names and star counts
+    - Timestamps of when snapshots were taken
+    - Optionally: Stargazer usernames and avatar URLs (if tracking enabled)
+
+    **Not collected:**
+    - No data is sent to external services
+    - No telemetry or analytics
+    - Your GitHub token is never logged or stored
+
+    For more details, see our [Security Policy](/security).
+  </Accordion>
+
+  <Accordion title="Can I track organization repositories?">
+    Yes! Use the `owned` visibility option to control whether to include organization repos.
+
+    ```yaml
+    # Track all repos (personal + org)
+    visibility: 'all'
+    
+    # Track only repos you personally own (excludes org)
+    visibility: 'owned'
+    ```
+
+    **Requirements:**
+    - Your PAT must have access to the organization
+    - For private org repos, use a Classic PAT with `repo` scope, or
+    - Use a Fine-grained PAT with resource owner set to the organization
+  </Accordion>
+
+  <Accordion title="What's the difference between Classic and Fine-grained tokens?">
+    **Classic PAT:**
+    - ✅ Simpler to set up
+    - ✅ Works with all organizations
+    - ⚠️ Broader permissions (all repos)
+    - Uses: `repo` or `public_repo` scope
+
+    **Fine-grained PAT:**
+    - ✅ More granular control
+    - ✅ Can limit to specific repositories
+    - ⚠️ More complex setup
+    - ⚠️ Not all organizations support them yet
+
+    For most users, a **Classic PAT** is recommended.
+
+    See our [Personal Access Token guide](/guides/personal-access-token) for detailed setup instructions.
+  </Accordion>
+</AccordionGroup>
+
+## Features & Functionality
+
+<AccordionGroup>
+  <Accordion title="Can I embed the charts in my README?">
+    Yes! The action generates SVG charts that you can embed anywhere.
+
+    ```markdown
+    ![Star History](https://raw.githubusercontent.com/USERNAME/REPO/star-tracker-data/charts/star-history.svg)
+    ![Top Repos](https://raw.githubusercontent.com/USERNAME/REPO/star-tracker-data/charts/comparison.svg)
+    ![Forecast](https://raw.githubusercontent.com/USERNAME/REPO/star-tracker-data/charts/forecast.svg)
+    ![Stars Badge](https://raw.githubusercontent.com/USERNAME/REPO/star-tracker-data/stars-badge.svg)
+    ```
+
+    **Dark mode support:**
+    - Charts automatically adapt to viewer's theme preference
+    - No configuration needed
+    - Uses CSS `prefers-color-scheme` media query
+
+    See [Viewing Reports](/guides/embedding-charts) for more embedding options.
+  </Accordion>
+
+  <Accordion title="How does stargazer tracking work?">
+    When enabled, the action tracks **who** starred your repositories, not just how many stars.
+
+    ```yaml
+    track-stargazers: true
+    ```
+
+    **What you get:**
+    - List of new stargazers since last run
+    - GitHub usernames with avatar images
+    - Timestamps of when they starred
+    - Links to their profiles
+
+    **Trade-offs:**
+    - ⚠️ Requires additional API calls (one per repository)
+    - ⚠️ Slower workflow execution (3-5 minutes instead of 1-2)
+    - ⚠️ May hit rate limits if you have many repositories
+
+    Best for: Users with a manageable number of active repositories who want detailed insights.
+  </Accordion>
+
+  <Accordion title="What are the different notification threshold modes?">
+    The `notification-threshold` setting controls when email notifications are sent.
+
+    **Options:**
+
+    | Value | Behavior | When to Use |
+    |-------|----------|-------------|
+    | `0` | Send on **every change** | You want to know about every star gained or lost |
+    | `N` (number) | Send only when change ≥ N | Reduce noise, only significant changes (e.g., `5`) |
+    | `auto` | **Adaptive threshold** | Intelligent notifications based on repo activity |
+
+    **Auto mode behavior:**
+    - Small repos (< 100 stars): Threshold = 1
+    - Medium repos (100-1000): Threshold = 5
+    - Large repos (> 1000): Threshold = 10
+
+    ```yaml
+    notification-threshold: 'auto'  # Recommended for most users
+    ```
+  </Accordion>
+
+  <Accordion title="Can I export data to Google Sheets or other tools?">
+    Yes! The action generates both JSON and CSV exports.
+
+    **CSV Export:**
+    ```yaml
+    - uses: fbuireu/github-star-tracker@v1
+      id: tracker
+    
+    - name: Download CSV
+      run: |
+        echo "${{ steps.tracker.outputs.report-csv }}" > stars.csv
+    ```
+
+    **JSON Data:**
+    The `star-tracker-data` branch contains:
+    - `snapshots.json`: Historical data
+    - `latest.json`: Most recent snapshot
+
+    **Integration examples:**
+    - Import CSV to Google Sheets
+    - Send JSON to a webhook
+    - Store in a database
+    - Build custom dashboards
+
+    See [API Reference](/api/action-outputs) for data formats.
+  </Accordion>
+
+  <Accordion title="What languages are supported?">
+    The action supports **4 languages**:
+
+    - 🇬🇧 **English** (`en`) - default
+    - 🇪🇸 **Spanish** (`es`)
+    - 🇮🇹 **Italian** (`it`)
+    - (Catalan) **Catalan** (`ca`)
+
+    ```yaml
+    locale: 'es'  # Spanish reports and emails
+    ```
+
+    **What's translated:**
+    - Report headers and labels
+    - Email subject and body
+    - Chart titles and legends
+    - Notification messages
+
+    Want to contribute a translation? See [Contributing](/contributing).
+  </Accordion>
+
+  <Accordion title="Can I track only specific repositories?">
+    Yes, use the `only-repos` option to exclusively track certain repositories.
+
+    ```yaml
+    only-repos: 'my-app,my-library,my-tool'
+    ```
+
+    This will **ignore all other repositories**, even if they match other filters.
+
+    **Alternative:** Use exclusion patterns if you want to exclude a few:
+
+    ```yaml
+    exclude-repos: 'test-repo,/^demo-.*$/'
+    ```
+
+    See [Configuration](/api/action-inputs) for more filtering options.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Questions
+
+<AccordionGroup>
+  <Accordion title="How much repository storage does this use?">
+    The data branch is very lightweight:
+
+    - **Initial commit**: ~50-100 KB
+    - **Per snapshot**: ~5-20 KB (depending on number of repos)
+    - **Charts**: ~50-150 KB total (SVG files)
+    - **52 weeks of history**: Typically < 5 MB
+
+    For reference:
+    - GitHub gives 1 GB free storage
+    - Average user: < 0.5% of quota
+
+    Old snapshots are automatically cleaned up based on `max-history` setting (default: 52).
+  </Accordion>
+
+  <Accordion title="Does this work with GitHub Enterprise Server (GHES)?">
+    Yes! The action automatically detects GHES environments.
+
+    **Auto-detection:**
+    - If running on a GHES runner, the API URL is detected automatically
+    - No configuration needed
+
+    **Manual configuration:**
+    ```yaml
+    github-api-url: 'https://github.example.com/api/v3'
+    ```
+
+    **Requirements:**
+    - GHES version 3.0 or later
+    - PAT with appropriate permissions
+
+    <Note>
+      Some features may not be available on older GHES versions.
+    </Note>
+  </Accordion>
+
+  <Accordion title="What API rate limits apply?">
+    **GitHub API rate limits:**
+
+    | Type | Limit | Applies To |
+    |------|-------|------------|
+    | Authenticated | 5,000 requests/hour | Users with PAT |
+    | Unauthenticated | 60 requests/hour | Without token |
+
+    **Typical API usage per run:**
+    - Fetching repositories: 1-3 requests (paginated)
+    - Without stargazer tracking: ~1-5 requests total
+    - With stargazer tracking: ~1-5 + (1 per repository) requests
+
+    **Example:**
+    - 50 repositories, no stargazer tracking: ~5 requests
+    - 50 repositories, with stargazer tracking: ~55 requests
+    - Running daily: ~1,650 requests/month (well under 5,000/hour limit)
+
+    <Note>
+      You're very unlikely to hit rate limits with normal usage.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Can I run this action locally for testing?">
+    While the action is designed for GitHub Actions, you can test the core logic locally:
+
+    **Option 1: Use `act` (GitHub Actions emulator)**
+    ```bash
+    # Install act: https://github.com/nektos/act
+    brew install act  # macOS
+    
+    # Run workflow locally
+    act -s GITHUB_STAR_TRACKER_TOKEN=ghp_xxx
+    ```
+
+    **Option 2: Trigger manually**
+    ```yaml
+    on:
+      workflow_dispatch:  # Adds "Run workflow" button
+    ```
+
+    Then go to Actions > Your Workflow > Run workflow.
+
+    **Option 3: Test on a schedule with verbose logs**
+    - Enable debug logging: Add repository secret `ACTIONS_STEP_DEBUG` = `true`
+    - Set a near-term cron schedule for testing
+    - Revert to normal schedule after testing
+  </Accordion>
+
+  <Accordion title="How are charts generated?">
+    Charts are generated using **pure SVG** (no external dependencies):
+
+    - Built-in TypeScript chart generator
+    - No image processing libraries required
+    - Animated using SVG `<animate>` elements
+    - Dark/light mode via CSS media queries
+
+    **Chart types:**
+    1. **Star History**: Line chart showing total stars over time
+    2. **Repository Comparison**: Bar chart of top N repositories
+    3. **Growth Forecast**: Predictive line chart with confidence intervals
+
+    **Advantages:**
+    - Fast generation (no dependencies to install)
+    - Small file size (50-150 KB)
+    - Scalable vector graphics (look sharp at any size)
+    - Accessible (can be read by screen readers)
+  </Accordion>
+
+  <Accordion title="What Node.js version is required?">
+    The action uses **Node.js 24** as specified in the action runtime.
+
+    ```yaml
+    runs:
+      using: 'node24'
+    ```
+
+    **For contributors:**
+    - Development requires Node.js 24+
+    - Uses pnpm for package management
+    - See [Contributing Guide](/contributing) for setup instructions
+
+    **For users:**
+    - No configuration needed
+    - GitHub Actions runners provide Node.js 24 automatically
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Why are some repositories missing from reports?">
+    **Check these filters:**
+
+    1. **Visibility filter**
+       ```yaml
+       visibility: 'all'  # public, private, all, or owned
+       ```
+
+    2. **Minimum stars threshold**
+       ```yaml
+       min-stars: '0'
+       ```
+
+    3. **Archived repositories**
+       ```yaml
+       include-archived: true
+       ```
+
+    4. **Forked repositories**
+       ```yaml
+       include-forks: true
+       ```
+
+    5. **Exclusion patterns**
+       ```yaml
+       exclude-repos: ''  # Remove any exclusions
+       ```
+
+    See [Troubleshooting](/troubleshooting) for detailed solutions.
+  </Accordion>
+
+  <Accordion title="Why aren't charts showing in my README?">
+    **Common issues:**
+
+    1. **Wrong URL format**
+       ```markdown
+       # Correct
+       ![Chart](https://raw.githubusercontent.com/USER/REPO/star-tracker-data/charts/star-history.svg)
+       
+       # Wrong (missing 'raw')
+       ![Chart](https://github.com/USER/REPO/blob/star-tracker-data/charts/star-history.svg)
+       ```
+
+    2. **Branch doesn't exist yet**
+       - Run the workflow at least once
+       - Check that it completed successfully
+
+    3. **Private repository**
+       - Images from private repos won't display publicly
+       - Solution: Move to a public repo or use a different hosting method
+
+    4. **Browser cache**
+       - Force refresh: Ctrl+F5 (Windows/Linux) or Cmd+Shift+R (Mac)
+       - Add cache-busting: `?v=1` at the end of the URL
+  </Accordion>
+
+  <Accordion title="Why am I not receiving email notifications?">
+    **Checklist:**
+
+    1. ✅ SMTP settings are correct
+    2. ✅ Email credentials are in repository secrets
+    3. ✅ Notification threshold is appropriate
+    4. ✅ Check spam folder
+    5. ✅ For Gmail: Use an App Password, not your account password
+
+    **Test configuration:**
+    ```yaml
+    notification-threshold: '0'    # Send on any change
+    send-on-no-changes: true       # Always send
+    ```
+
+    See [Email Notifications](/guides/email-notifications) for detailed setup.
+  </Accordion>
+</AccordionGroup>
+
+## Still Have Questions?
+
+<CardGroup cols={2}>
+  <Card title="Documentation" icon="book" href="/quickstart">
+    Browse the complete documentation
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Detailed solutions to common issues
+  </Card>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/fbuireu/github-star-tracker/discussions">
+    Ask questions and get help from the community
+  </Card>
+  <Card title="Report a Bug" icon="bug" href="https://github.com/fbuireu/github-star-tracker/issues/new?template=bug_report.yml">
+    Found a problem? Let us know
+  </Card>
+</CardGroup>

@@ -1,0 +1,335 @@
+---
+title: Security Policy
+description: Security considerations and vulnerability reporting for GitHub Star Tracker
+icon: shield-halved
+---
+
+This page outlines the security policy for GitHub Star Tracker, including supported versions, how to report vulnerabilities, and best practices for secure usage.
+
+## Supported Versions
+
+We release patches for security vulnerabilities in supported versions:
+
+| Version | Supported |
+|---------|----------|
+| 1.x.x   | ✅ Yes    |
+| < 1.0   | ❌ No     |
+
+<Note>
+  Always use the latest version (`@v1` tag) to receive security updates automatically.
+</Note>
+
+## Reporting a Vulnerability
+
+**Please do not report security vulnerabilities through public GitHub issues.**
+
+If you discover a security vulnerability, please report it privately using one of these methods:
+
+### Preferred: GitHub Private Vulnerability Reporting
+
+1. Go to the [Security tab](https://github.com/fbuireu/github-star-tracker/security)
+2. Click "Report a vulnerability"
+3. Fill in the vulnerability details
+
+### Alternative: Email
+
+Send an email to **fbuireu@gmail.com** with:
+
+- **Type of issue**: Token exposure, code injection, etc.
+- **Affected files**: Full paths of source files
+- **Location**: Tag/branch/commit or direct URL
+- **Reproduction**: Step-by-step instructions
+- **Configuration**: Any special setup required
+- **Proof-of-concept**: Exploit code if available
+- **Impact**: How an attacker might exploit it
+
+### What to Expect
+
+- **Acknowledgment**: Within 48 hours of report
+- **Updates**: Regular progress updates on the fix
+- **Timeline**: Critical issues fixed within 7 days
+- **Credit**: You'll be credited in the security advisory (unless you prefer anonymity)
+- **Disclosure**: We follow a 90-day responsible disclosure policy
+
+## Security Best Practices
+
+When using GitHub Star Tracker, follow these security guidelines:
+
+### 1. Token Permissions
+
+Always use **minimal token permissions** required for your use case.
+
+#### Classic Token
+
+```yaml
+# For public repositories only
+scope: public_repo
+
+# For public and private repositories
+scope: repo
+```
+
+#### Fine-grained Token
+
+```yaml
+Repository permissions:
+  Contents: Read         # Required always
+  Contents: Write        # Only if using data-branch
+  Metadata: Read         # Required always
+```
+
+#### Workflow Permissions
+
+```yaml
+permissions:
+  contents: write  # Only if using data-branch
+  # Do not grant unnecessary permissions
+```
+
+<Warning>
+  Never use a token with more permissions than necessary. If you only need to track public repositories, use `public_repo` scope.
+</Warning>
+
+### 2. Secrets Management
+
+**Never expose tokens in logs or outputs:**
+
+```yaml
+# ✅ Good - Using secrets
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    smtp-password: ${{ secrets.SMTP_PASSWORD }}
+
+# ❌ Bad - Hardcoded credentials
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ghp_xxxxxxxxxxxxx
+    smtp-password: mypassword123
+```
+
+**Best practices:**
+- Store all sensitive data in [GitHub Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
+- Use descriptive secret names (e.g., `GITHUB_STAR_TRACKER_TOKEN`, not `TOKEN`)
+- Rotate tokens regularly (every 6-12 months)
+- Delete unused tokens immediately
+- Use organization secrets for shared access
+
+### 3. Configuration Files
+
+**Avoid committing sensitive data in configuration files:**
+
+```yaml
+# star-tracker.yml
+reporting:
+  email:
+    smtp_password: ${{ secrets.SMTP_PASSWORD }}  # ✅ Use secrets
+    # smtp_password: mypassword  # ❌ Never hardcode
+```
+
+**Safe practices:**
+- Keep config files in version control, but reference secrets
+- Use `.gitignore` for local test configurations
+- Review config files before committing
+
+### 4. Regular Updates
+
+Keep the action updated to receive security patches:
+
+```yaml
+# ✅ Recommended - Auto-updates minor/patch versions
+- uses: fbuireu/github-star-tracker@v1
+
+# ⚠️ Pinned version - Won't get security fixes automatically
+- uses: fbuireu/github-star-tracker@v1.0.0
+
+# ❌ Not recommended - Can break unexpectedly
+- uses: fbuireu/github-star-tracker@main
+```
+
+**Update strategy:**
+- Use `@v1` tag for automatic minor and patch updates
+- Subscribe to [release notifications](https://github.com/fbuireu/github-star-tracker/releases)
+- Monitor security advisories
+- Test updates in a staging environment first
+
+## Known Security Considerations
+
+### GitHub Token Access
+
+This action requires a GitHub token with repository access. The token is used to:
+
+- ✅ Read repository information
+- ✅ Read star counts
+- ✅ Write to data branch (optional)
+- ✅ Fetch stargazer data (optional)
+
+**The token is:**
+- Stored securely in GitHub Secrets (encrypted at rest)
+- Only accessible during workflow execution
+- Never logged or stored by the action
+- Not sent to any external services
+
+**Token security:**
+- Use a dedicated PAT (don't reuse tokens across projects)
+- Limit token scope to minimum required permissions
+- Set token expiration dates
+- Revoke immediately if compromised
+
+### Data Storage
+
+If using the `data-branch` feature:
+
+**What's stored:**
+- Repository names and star counts
+- Timestamps of snapshots
+- Stargazer usernames and avatars (if tracking enabled)
+
+**Visibility:**
+- Data branch inherits repository visibility
+- Public repositories → Public data
+- Private repositories → Private data
+
+**Privacy considerations:**
+- Don't enable `data-branch` on public repos if you want to keep star data private
+- Stargazer information is already public on GitHub
+- Historical data is only accessible to those with repository access
+
+<Note>
+  The action does **not** collect, store, or transmit data to any external services or analytics platforms.
+</Note>
+
+### Email Notifications
+
+When using email notifications:
+
+**Security measures:**
+- SMTP credentials stored in GitHub Secrets
+- TLS/SSL encryption for email transmission (when supported by provider)
+- No email content logged by the action
+
+**Risks:**
+- Email content may include repository names and star counts
+- Emails may be intercepted if SMTP server doesn't support TLS
+- Email provider may scan/log email contents
+
+**Recommendations:**
+- Use providers with strong security (Gmail, Microsoft 365, ProtonMail)
+- Enable 2FA on email accounts
+- Use app-specific passwords (not account passwords)
+- Don't send sensitive data via email
+
+## Security Updates
+
+Security updates will be released as:
+
+- **Patch versions** (e.g., 1.0.1) for backward-compatible fixes
+- **Minor versions** (e.g., 1.1.0) if changes affect functionality
+- **Documented in release notes** with `[Security]` tag
+- **Security advisories** for critical vulnerabilities
+
+**Stay informed:**
+- Watch the repository: **Watch > Custom > Releases**
+- Enable Dependabot security alerts in repository settings
+- Subscribe to the [security advisories feed](https://github.com/fbuireu/github-star-tracker/security/advisories)
+
+## Vulnerability Disclosure Policy
+
+When a security vulnerability is reported:
+
+1. **Acknowledgment**: We confirm receipt within 48 hours
+2. **Assessment**: We evaluate severity and impact
+3. **Fix development**: We develop and test a patch
+4. **Private disclosure**: Reporter is notified of fix
+5. **Public release**: Security update released with advisory
+6. **Public disclosure**: Details published after 90 days or fix deployment
+
+**Severity levels:**
+- 🔴 **Critical**: Immediate fix (within 7 days)
+- 🟠 **High**: Urgent fix (within 14 days)
+- 🟡 **Medium**: Prioritized fix (within 30 days)
+- 🟢 **Low**: Standard timeline (within 90 days)
+
+## Audit and Compliance
+
+### Code Review
+
+- All code changes reviewed by maintainers
+- Automated security scanning via GitHub CodeQL
+- Dependency vulnerability scanning via Dependabot
+- 95%+ test coverage for critical paths
+
+### Third-party Dependencies
+
+**This action has zero runtime dependencies** (fully bundled).
+
+- Dev dependencies only used during build
+- All dependencies regularly updated
+- Automated dependency vulnerability alerts
+- Manual review of all dependency updates
+
+### Data Handling
+
+**What we collect:**
+- Nothing. The action runs entirely in your GitHub Actions environment.
+
+**What we don't collect:**
+- No telemetry or analytics
+- No crash reports or error logs
+- No usage statistics
+- No personal information
+
+### Compliance
+
+- **GDPR**: No personal data processed by maintainers
+- **SOC 2**: Inherits GitHub's SOC 2 compliance
+- **ISO 27001**: Runs in GitHub's certified infrastructure
+
+## Additional Security Resources
+
+<CardGroup cols={2}>
+  <Card title="GitHub Security" icon="shield-halved" href="https://docs.github.com/en/actions/security-guides">
+    GitHub Actions security best practices
+  </Card>
+  <Card title="Token Security" icon="key" href="/guides/personal-access-token">
+    How to securely configure tokens
+  </Card>
+  <Card title="Secrets Management" icon="lock" href="https://docs.github.com/en/actions/security-guides/encrypted-secrets">
+    Using encrypted secrets in workflows
+  </Card>
+  <Card title="Report Vulnerability" icon="bug" href="https://github.com/fbuireu/github-star-tracker/security">
+    Private vulnerability reporting
+  </Card>
+</CardGroup>
+
+## Security Checklist
+
+Before deploying GitHub Star Tracker:
+
+- ✅ Created PAT with minimal required scopes
+- ✅ Stored token in GitHub Secrets (not hardcoded)
+- ✅ Set workflow permissions to `contents: write` only if needed
+- ✅ Using `@v1` tag for automatic security updates
+- ✅ Reviewed configuration for exposed secrets
+- ✅ Enabled Dependabot security alerts
+- ✅ Using SMTP with TLS/SSL for email notifications
+- ✅ Set token expiration date
+- ✅ Documented who has access to secrets
+
+<Warning>
+  If you suspect a security issue with your deployment, immediately revoke the PAT and rotate all credentials.
+</Warning>
+
+## Questions?
+
+For security-related questions:
+
+- 🔒 **Private security issues**: Email fbuireu@gmail.com
+- 💬 **General security questions**: [GitHub Discussions](https://github.com/fbuireu/github-star-tracker/discussions)
+- 📖 **Security documentation**: This page
+
+---
+
+<div style="text-align: center; margin-top: 2rem;">
+  <strong>Security is a shared responsibility. Thank you for helping keep GitHub Star Tracker secure!</strong>
+</div>

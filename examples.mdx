@@ -1,0 +1,692 @@
+---
+title: Examples
+description: Real-world workflow configurations for different use cases
+icon: code
+---
+
+This page provides complete, copy-paste-ready workflow configurations for common scenarios.
+
+## Basic Configuration
+
+### Minimal Setup
+
+The simplest configuration for tracking all your public repositories.
+
+```yaml
+name: Track Stars
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  workflow_dispatch:     # Manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+```
+
+**What this does:**
+- Tracks all repositories (public and private)
+- Runs daily at midnight UTC
+- Generates charts and reports
+- Stores data in `star-tracker-data` branch
+
+### Public Repositories Only
+
+Track only your public repositories.
+
+```yaml
+name: Track Public Stars
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          visibility: 'public'
+```
+
+### Personal Repositories Only (Exclude Organizations)
+
+Track only repositories you personally own, excluding organization repos.
+
+```yaml
+name: Track Personal Stars
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          visibility: 'owned'
+```
+
+## Filtering & Customization
+
+### Filter by Minimum Stars
+
+Only track repositories with at least 10 stars.
+
+```yaml
+name: Track Popular Repos
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          min-stars: '10'
+          include-archived: false
+          include-forks: false
+```
+
+**Use case:** Focus on your most popular projects and ignore test repos.
+
+### Exclude Specific Repositories
+
+Exclude test, demo, or archived repositories using patterns.
+
+```yaml
+name: Track Production Repos
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          exclude-repos: 'test-repo,sandbox,/^demo-.*$/,/^archive-/'
+          include-archived: false
+```
+
+**Pattern syntax:**
+- Exact match: `test-repo`
+- Regex: `/^demo-.*$/` (matches repos starting with "demo-")
+
+### Track Only Specific Repositories
+
+Exclusively track a handful of important repositories.
+
+```yaml
+name: Track Key Projects
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          only-repos: 'my-app,my-library,my-tool'
+```
+
+## Email Notifications
+
+### Gmail Notifications
+
+Send email notifications via Gmail when stars change.
+
+```yaml
+name: Track Stars with Gmail Alerts
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          smtp-host: 'smtp.gmail.com'
+          smtp-port: '587'
+          smtp-username: ${{ secrets.GMAIL_USERNAME }}
+          smtp-password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          email-to: 'your-email@gmail.com'
+          email-from: 'GitHub Star Tracker'
+          notification-threshold: '0'
+```
+
+<Warning>
+  For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833), not your regular Google account password.
+</Warning>
+
+**Setup steps:**
+1. Generate a Gmail App Password
+2. Add to repository secrets:
+   - `GMAIL_USERNAME`: your full email
+   - `GMAIL_APP_PASSWORD`: the 16-character app password
+
+### Adaptive Notifications
+
+Use intelligent threshold based on repository size.
+
+```yaml
+name: Track Stars with Smart Alerts
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          smtp-host: ${{ secrets.SMTP_HOST }}
+          smtp-port: '587'
+          smtp-username: ${{ secrets.SMTP_USERNAME }}
+          smtp-password: ${{ secrets.SMTP_PASSWORD }}
+          email-to: ${{ secrets.NOTIFICATION_EMAIL }}
+          notification-threshold: 'auto'  # Adaptive thresholds
+```
+
+**Auto mode behavior:**
+- Small repos (< 100 stars): Notify on 1+ change
+- Medium repos (100-1000): Notify on 5+ changes
+- Large repos (> 1000): Notify on 10+ changes
+
+### Threshold-based Notifications
+
+Only notify when 5 or more stars change.
+
+```yaml
+name: Track Stars with Threshold
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          smtp-host: ${{ secrets.SMTP_HOST }}
+          smtp-port: '587'
+          smtp-username: ${{ secrets.SMTP_USERNAME }}
+          smtp-password: ${{ secrets.SMTP_PASSWORD }}
+          email-to: ${{ secrets.NOTIFICATION_EMAIL }}
+          notification-threshold: '5'  # Only when ≥5 stars change
+```
+
+## Advanced Features
+
+### Stargazer Tracking
+
+Track individual users who star your repositories.
+
+```yaml
+name: Track Stars and Stargazers
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          track-stargazers: true
+          top-repos: '5'  # Reduce for faster execution
+```
+
+<Note>
+  Stargazer tracking requires additional API calls and increases execution time. Best for users with fewer repositories.
+</Note>
+
+**What you get:**
+- List of new stargazers with avatars
+- GitHub profiles and timestamps
+- Links to stargazer profiles in reports
+
+### Multi-language Reports
+
+Generate reports in Spanish.
+
+```yaml
+name: Seguimiento de Estrellas
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          locale: 'es'  # Spanish (options: en, es, ca, it)
+```
+
+**Supported languages:**
+- `en`: English (default)
+- `es`: Spanish
+- `ca`: Catalan
+- `it`: Italian
+
+### Extended History
+
+Keep 2 years of historical data instead of the default 52 weeks.
+
+```yaml
+name: Track Stars with Extended History
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly (Sunday)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          max-history: '104'  # 2 years of weekly snapshots
+```
+
+### Custom Data Branch
+
+Store tracking data in a custom branch name.
+
+```yaml
+name: Track Stars
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          data-branch: 'metrics-data'  # Custom branch name
+```
+
+## Scheduling Patterns
+
+### Multiple Times Per Day
+
+Run at 8 AM and 8 PM UTC.
+
+```yaml
+on:
+  schedule:
+    - cron: '0 8,20 * * *'  # 8 AM and 8 PM UTC
+  workflow_dispatch:
+```
+
+### Weekly on Specific Day
+
+Run every Sunday at midnight.
+
+```yaml
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Sunday (0 = Sunday, 6 = Saturday)
+  workflow_dispatch:
+```
+
+### First Day of Month
+
+Run on the 1st of each month.
+
+```yaml
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # 1st day of month at midnight
+  workflow_dispatch:
+```
+
+### Every 6 Hours
+
+```yaml
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+```
+
+<Note>
+  Use [crontab.guru](https://crontab.guru/) to generate and understand cron expressions.
+</Note>
+
+## Output Chaining
+
+### Use Outputs in Subsequent Steps
+
+Access star data in other workflow steps.
+
+```yaml
+name: Track Stars and Post to Slack
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        id: tracker
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+      
+      - name: Post to Slack
+        if: steps.tracker.outputs.stars-changed == 'true'
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "⭐ Star Update!",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Total Stars:* ${{ steps.tracker.outputs.total-stars }}\n*New Stars:* +${{ steps.tracker.outputs.new-stars }}\n*Lost Stars:* -${{ steps.tracker.outputs.lost-stars }}"
+                  }
+                }
+              ]
+            }
+```
+
+### Save CSV to Artifact
+
+Store CSV reports as workflow artifacts.
+
+```yaml
+name: Track Stars and Save CSV
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        id: tracker
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+      
+      - name: Save CSV Report
+        run: |
+          echo '${{ steps.tracker.outputs.report-csv }}' > stars-report.csv
+      
+      - name: Upload CSV Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: star-report
+          path: stars-report.csv
+          retention-days: 30
+```
+
+### Conditional Execution
+
+Only run subsequent steps if stars changed significantly.
+
+```yaml
+name: Track Stars with Conditional Actions
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        id: tracker
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          notification-threshold: '10'
+      
+      - name: Celebrate Milestone
+        if: steps.tracker.outputs.should-notify == 'true'
+        run: |
+          echo "🎉 Significant star changes detected!"
+          echo "New stars: ${{ steps.tracker.outputs.new-stars }}"
+          # Add custom celebration logic here
+```
+
+## GitHub Enterprise
+
+### GitHub Enterprise Server (GHES)
+
+Auto-detection (no configuration needed on GHES runners):
+
+```yaml
+name: Track Stars (GHES)
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: self-hosted  # GHES runner
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          # github-api-url is auto-detected
+```
+
+Manual API URL specification:
+
+```yaml
+name: Track Stars (GHES Manual)
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          github-api-url: 'https://github.example.com/api/v3'
+```
+
+## Configuration File
+
+### Using YAML Config File
+
+Store configuration in a separate file for better organization.
+
+**Workflow:** `.github/workflows/star-tracker.yml`
+```yaml
+name: Track Stars
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4  # Required to access config file
+      
+      - uses: fbuireu/github-star-tracker@v1
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          config-path: 'star-tracker.yml'
+```
+
+**Config file:** `star-tracker.yml` (in repository root)
+```yaml
+visibility: public
+locale: en
+include-charts: true
+max-history: 52
+top-repos: 10
+track-stargazers: false
+include-archived: false
+include-forks: false
+min-stars: 5
+exclude-repos:
+  - test-repo
+  - /^demo-.*$/
+
+reporting:
+  email:
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    smtp_username: ${{ secrets.SMTP_USERNAME }}
+    smtp_password: ${{ secrets.SMTP_PASSWORD }}
+    email_to: notifications@example.com
+    email_from: GitHub Star Tracker
+    notification_threshold: auto
+    send_on_no_changes: false
+```
+
+<Note>
+  Workflow inputs override config file values. This allows for environment-specific overrides.
+</Note>
+
+## More Examples
+
+<CardGroup cols={2}>
+  <Card title="Configuration Guide" icon="sliders" href="/api/action-inputs">
+    Complete list of all configuration options
+  </Card>
+  <Card title="API Reference" icon="brackets-curly" href="/api/action-outputs">
+    All outputs and data formats
+  </Card>
+  <Card title="Email Notifications" icon="envelope" href="/guides/email-notifications">
+    Detailed email setup and providers
+  </Card>
+  <Card title="Viewing Reports" icon="chart-line" href="/guides/embedding-charts">
+    How to access and embed reports
+  </Card>
+</CardGroup>

@@ -1,0 +1,320 @@
+---
+title: Repository Filtering
+description: Learn how to filter which repositories to track using visibility, patterns, and exclusions
+---
+
+GitHub Star Tracker provides powerful filtering options to control which repositories are tracked. This is especially useful when you have many repositories but only want to monitor specific ones.
+
+## Filter Execution Order
+
+Filters are applied in the following order:
+
+1. **only-repos** - If specified, only these repositories are tracked (all other filters are ignored)
+2. **visibility** - Filter by public/private/owned
+3. **include-archived** - Include or exclude archived repositories
+4. **include-forks** - Include or exclude forked repositories
+5. **exclude-repos** - Exclude specific repositories or patterns
+6. **min-stars** - Minimum star threshold
+
+<Info>
+  When `only-repos` is set, it takes precedence over all other filters. Use it when you want to track an explicit list of repositories.
+</Info>
+
+## Visibility Filter
+
+The `visibility` option controls which repositories are fetched based on their visibility status.
+
+### Available Options
+
+<AccordionGroup>
+  <Accordion title="all (default)">
+    Tracks both public and private repositories you have access to.
+    
+    ```yaml
+    visibility: all
+    ```
+  </Accordion>
+  
+  <Accordion title="public">
+    Only public repositories.
+    
+    ```yaml
+    visibility: public
+    ```
+  </Accordion>
+  
+  <Accordion title="private">
+    Only private repositories.
+    
+    ```yaml
+    visibility: private
+    ```
+  </Accordion>
+  
+  <Accordion title="owned">
+    Only repositories you own. Excludes organization repositories where you're a member but not the owner.
+    
+    ```yaml
+    visibility: owned
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Configuration Examples
+
+<CodeGroup>
+```yaml Action Input
+with:
+  visibility: public
+```
+
+```yaml Configuration File
+visibility: public
+```
+</CodeGroup>
+
+## Repository Status Filters
+
+Control whether archived and forked repositories are included.
+
+### Include Archived Repositories
+
+By default, archived repositories are excluded. Enable this to track them:
+
+<CodeGroup>
+```yaml Action Input
+with:
+  include-archived: true
+```
+
+```yaml Configuration File
+include_archived: true
+```
+</CodeGroup>
+
+### Include Forked Repositories
+
+By default, forked repositories are excluded. Enable this to track them:
+
+<CodeGroup>
+```yaml Action Input
+with:
+  include-forks: true
+```
+
+```yaml Configuration File
+include_forks: true
+```
+</CodeGroup>
+
+## Exclude Repositories
+
+Exclude specific repositories by name or using regex patterns.
+
+### Exact Name Matching
+
+Exclude repositories by their exact name:
+
+<CodeGroup>
+```yaml Action Input
+with:
+  exclude-repos: old-repo, test-repo, archived-project
+```
+
+```yaml Configuration File
+exclude_repos:
+  - old-repo
+  - test-repo
+  - archived-project
+```
+</CodeGroup>
+
+### Regex Patterns
+
+Use regular expressions for pattern-based exclusions. Regex patterns must be wrapped in forward slashes with optional flags: `/pattern/flags`
+
+<CodeGroup>
+```yaml Action Input
+with:
+  exclude-repos: /^test-.*/, /^draft/i, /-old$/
+```
+
+```yaml Configuration File
+exclude_repos:
+  - /^test-.*/      # Exclude repos starting with "test-"
+  - /^draft/i       # Exclude repos containing "draft" (case-insensitive)
+  - /-old$/         # Exclude repos ending with "-old"
+```
+</CodeGroup>
+
+### Common Patterns
+
+| Pattern | Description | Example Matches |
+|---------|-------------|----------------|
+| `/^test-.*/` | Starts with "test-" | test-app, test-lib |
+| `/.*-old$/` | Ends with "-old" | project-old, app-old |
+| `/demo/i` | Contains "demo" (case-insensitive) | Demo-App, my-demo, DEMO |
+| `/^(temp\|tmp)-.*/` | Starts with "temp-" or "tmp-" | temp-repo, tmp-test |
+| `/[0-9]{4}$/` | Ends with 4 digits | backup-2023, archive-2024 |
+
+### Implementation Details
+
+The filtering logic is implemented in `src/infrastructure/github/filters.ts:14-23`:
+
+```typescript
+function matchesExcludePattern({ name, patterns }: MatchesExcludePatternParams): boolean {
+  return patterns.some((pattern) => {
+    const match = REGEX_PATTERN.exec(pattern);
+    if (match) {
+      const regex = new RegExp(match[1], match[2]);
+      return regex.test(name);
+    }
+    return name === pattern;
+  });
+}
+```
+
+## Only Repositories (Allowlist)
+
+Track only specific repositories, ignoring all other filters.
+
+<Warning>
+  When `only-repos` is set, **all other filters are ignored**. This creates an explicit allowlist.
+</Warning>
+
+<CodeGroup>
+```yaml Action Input
+with:
+  only-repos: my-main-repo, my-other-repo, important-project
+```
+
+```yaml Configuration File
+only_repos:
+  - my-main-repo
+  - my-other-repo
+  - important-project
+```
+</CodeGroup>
+
+## Minimum Star Threshold
+
+Only track repositories with at least a certain number of stars.
+
+<CodeGroup>
+```yaml Action Input
+with:
+  min-stars: 5
+```
+
+```yaml Configuration File
+min_stars: 5
+```
+</CodeGroup>
+
+<Tip>
+  This is useful for focusing on your more popular repositories and reducing noise from new or experimental projects.
+</Tip>
+
+## Filter Examples
+
+### Example 1: Only Popular Public Repositories
+
+Track only public repositories with at least 10 stars:
+
+```yaml star-tracker.yml
+visibility: public
+include_archived: false
+include_forks: false
+min_stars: 10
+```
+
+### Example 2: All Owned Repos Except Tests
+
+Track all repositories you own, excluding test projects:
+
+```yaml star-tracker.yml
+visibility: owned
+include_archived: true
+include_forks: false
+exclude_repos:
+  - /^test-.*/
+  - /.*-test$/
+  - /demo/i
+```
+
+### Example 3: Specific Projects Only
+
+Track only your main projects:
+
+```yaml star-tracker.yml
+only_repos:
+  - my-awesome-lib
+  - my-popular-tool
+  - flagship-project
+```
+
+### Example 4: All Non-Fork Public Repos
+
+Track all public repositories that aren't forks, including archived ones:
+
+```yaml star-tracker.yml
+visibility: public
+include_archived: true
+include_forks: false
+min_stars: 1
+```
+
+### Example 5: Complex Filtering
+
+Combine multiple filters for precise control:
+
+```yaml star-tracker.yml
+visibility: all
+include_archived: false
+include_forks: false
+exclude_repos:
+  - /^test-.*/        # No test repos
+  - /^draft-.*/       # No draft repos
+  - /-backup$/        # No backup repos
+  - /^\..*/           # No repos starting with a dot
+  - old-website
+  - legacy-app
+min_stars: 3
+```
+
+## Testing Your Filters
+
+To test your filtering configuration:
+
+1. **Use workflow_dispatch**: Run the action manually to see which repositories are tracked
+2. **Check action logs**: The action logs show how many repositories were found and filtered:
+
+```text
+Config: visibility=public, includeArchived=false, includeForks=false
+After filtering: 12 repos
+```
+
+3. **Use only-repos first**: Start with an explicit list, then transition to filters once you understand the pattern
+
+## Filter Configuration Matrix
+
+Here's a quick reference for common filtering scenarios:
+
+| Scenario | visibility | include-archived | include-forks | exclude-repos | min-stars |
+|----------|-----------|-----------------|---------------|--------------|----------|
+| All my repos | `all` | `true` | `true` | - | `0` |
+| Public repos only | `public` | `false` | `false` | - | `0` |
+| Popular repos | `all` | `false` | `false` | - | `10` |
+| Production repos | `all` | `false` | `false` | `/^test-.*/,/draft/i` | `0` |
+| Personal projects | `owned` | `false` | `false` | - | `0` |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Action Inputs" icon="sliders" href="/configuration/inputs">
+    View all available configuration options
+  </Card>
+  <Card title="Notifications" icon="bell" href="/configuration/notifications">
+    Configure when to send notifications
+  </Card>
+</CardGroup>

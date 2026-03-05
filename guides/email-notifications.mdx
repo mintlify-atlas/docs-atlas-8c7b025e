@@ -1,0 +1,436 @@
+---
+title: Email Notifications
+description: Configure built-in SMTP email notifications for star changes and activity reports
+---
+
+GitHub Star Tracker includes built-in email notification support via SMTP. Get notified when star counts change, with configurable thresholds and HTML reports.
+
+## Overview
+
+Email notifications provide:
+
+- HTML-formatted reports with star changes
+- Visual charts and trend data
+- Configurable notification thresholds
+- Support for any SMTP provider
+- Optional notifications even when no changes occur
+
+## Basic SMTP Setup
+
+To enable email notifications, configure SMTP settings in your workflow:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    
+    # SMTP Configuration
+    smtp-host: 'smtp.gmail.com'
+    smtp-port: '587'
+    smtp-username: ${{ secrets.SMTP_USERNAME }}
+    smtp-password: ${{ secrets.SMTP_PASSWORD }}
+    
+    # Email Settings
+    email-to: 'your-email@example.com'
+    email-from: 'GitHub Star Tracker'
+```
+
+<Warning>
+  Store SMTP credentials as repository secrets, never in plaintext in workflow files.
+</Warning>
+
+## Adding SMTP Secrets
+
+<Steps>
+  <Step title="Navigate to Repository Settings">
+    Go to your repository > **Settings** > **Secrets and variables** > **Actions**
+  </Step>
+
+  <Step title="Add SMTP Username">
+    - Click **New repository secret**
+    - Name: `SMTP_USERNAME`
+    - Value: Your SMTP username (often your email address)
+    - Click **Add secret**
+  </Step>
+
+  <Step title="Add SMTP Password">
+    - Click **New repository secret**
+    - Name: `SMTP_PASSWORD`
+    - Value: Your SMTP password or app-specific password
+    - Click **Add secret**
+  </Step>
+</Steps>
+
+## SMTP Provider Configuration
+
+### Gmail
+
+<Steps>
+  <Step title="Enable 2-Factor Authentication">
+    Gmail requires 2FA to use app passwords. Enable it in [Google Account Settings](https://myaccount.google.com/security).
+  </Step>
+
+  <Step title="Generate App Password">
+    1. Go to [App Passwords](https://myaccount.google.com/apppasswords)
+    2. Select **Mail** and **Other (Custom name)**
+    3. Name it "GitHub Star Tracker"
+    4. Copy the generated 16-character password
+  </Step>
+
+  <Step title="Configure Workflow">
+    ```yaml
+    smtp-host: 'smtp.gmail.com'
+    smtp-port: '587'
+    smtp-username: ${{ secrets.SMTP_USERNAME }}  # your Gmail address
+    smtp-password: ${{ secrets.SMTP_PASSWORD }}  # app password
+    email-to: 'your-email@gmail.com'
+    ```
+  </Step>
+</Steps>
+
+### Outlook / Office 365
+
+```yaml
+smtp-host: 'smtp.office365.com'
+smtp-port: '587'
+smtp-username: ${{ secrets.SMTP_USERNAME }}  # your Outlook email
+smtp-password: ${{ secrets.SMTP_PASSWORD }}  # your password
+email-to: 'your-email@outlook.com'
+```
+
+### SendGrid
+
+```yaml
+smtp-host: 'smtp.sendgrid.net'
+smtp-port: '587'
+smtp-username: 'apikey'  # Literal string 'apikey'
+smtp-password: ${{ secrets.SENDGRID_API_KEY }}  # Your SendGrid API key
+email-to: 'your-email@example.com'
+email-from: 'notifications@yourdomain.com'
+```
+
+### Amazon SES
+
+```yaml
+smtp-host: 'email-smtp.us-east-1.amazonaws.com'  # Your SES region
+smtp-port: '587'
+smtp-username: ${{ secrets.SES_SMTP_USERNAME }}  # SES SMTP credentials
+smtp-password: ${{ secrets.SES_SMTP_PASSWORD }}
+email-to: 'your-email@example.com'
+email-from: 'notifications@verified-domain.com'  # Must be verified in SES
+```
+
+### Custom SMTP Server
+
+```yaml
+smtp-host: 'mail.yourdomain.com'
+smtp-port: '587'  # or 465 for SSL
+smtp-username: ${{ secrets.SMTP_USERNAME }}
+smtp-password: ${{ secrets.SMTP_PASSWORD }}
+email-to: 'admin@yourdomain.com'
+email-from: 'Star Tracker <noreply@yourdomain.com>'
+```
+
+## Port Configuration
+
+Star Tracker supports standard SMTP ports:
+
+| Port | Security | Usage |
+|------|----------|-------|
+| `587` | STARTTLS | Recommended for most providers (default) |
+| `465` | SSL/TLS | Direct SSL connection |
+| `25` | None/STARTTLS | Legacy, often blocked by cloud providers |
+
+The action automatically detects SSL mode when using port `465`.
+
+From the source code (src/infrastructure/notification/email.ts:55-60):
+
+```typescript
+const secure = emailConfig.port === SECURE_SMTP_PORT;  // 465
+
+const transporter = nodemailer.createTransport({
+  host: emailConfig.host,
+  port: emailConfig.port,
+  secure,  // true if port 465
+  // ...
+});
+```
+
+## Notification Thresholds
+
+Control when notifications are sent based on star changes:
+
+### Send Every Run
+
+```yaml
+notification-threshold: '0'
+send-on-no-changes: true  # Send even if no stars changed
+```
+
+### Send on Specific Threshold
+
+```yaml
+notification-threshold: '5'  # Only notify if 5+ stars changed
+```
+
+### Adaptive Threshold
+
+```yaml
+notification-threshold: 'auto'  # Automatically adjusts based on history
+```
+
+The `auto` mode intelligently determines when to notify based on historical patterns.
+
+### Conditional Notifications
+
+Use workflow conditions for more control:
+
+```yaml
+- name: Track stars
+  id: tracker
+  uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    smtp-host: 'smtp.gmail.com'
+    smtp-port: '587'
+    smtp-username: ${{ secrets.SMTP_USERNAME }}
+    smtp-password: ${{ secrets.SMTP_PASSWORD }}
+    email-to: 'your-email@example.com'
+    notification-threshold: '0'
+
+# Only send if significant changes
+- name: Send special notification
+  if: steps.tracker.outputs.new-stars >= 10
+  run: |
+    echo "Major milestone: 10+ new stars!"
+    # Custom notification logic here
+```
+
+## Email Content
+
+Email notifications include:
+
+- **Subject Line**: Summary of star changes (e.g., "Star Update: +5 stars")
+- **HTML Report**: Formatted tables with:
+  - Total star count
+  - New stars gained
+  - Stars lost
+  - Repository breakdown
+  - Star change delta per repository
+- **Charts**: Embedded SVG charts (if `include-charts: true`)
+- **Stargazer Info**: New stargazers (if `track-stargazers: true`)
+
+## Complete Example
+
+Full workflow configuration with email notifications:
+
+```yaml
+name: Track Stars with Email
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Track stars and notify
+        uses: fbuireu/github-star-tracker@v1
+        with:
+          # Authentication
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+          
+          # Repository settings
+          visibility: 'public'
+          include-charts: true
+          track-stargazers: true
+          locale: 'en'
+          
+          # SMTP Configuration
+          smtp-host: 'smtp.gmail.com'
+          smtp-port: '587'
+          smtp-username: ${{ secrets.SMTP_USERNAME }}
+          smtp-password: ${{ secrets.SMTP_PASSWORD }}
+          
+          # Email Settings
+          email-to: 'your-email@example.com'
+          email-from: 'GitHub Star Tracker'
+          notification-threshold: 'auto'
+          send-on-no-changes: false
+```
+
+## Testing Email Configuration
+
+Test your email setup:
+
+<Steps>
+  <Step title="Run Workflow Manually">
+    Go to **Actions** > **Your Workflow** > **Run workflow**
+  </Step>
+
+  <Step title="Check Workflow Logs">
+    Look for email-related messages in the logs:
+    ```
+    Email sent: <message-id>
+    ```
+  </Step>
+
+  <Step title="Verify Email Delivery">
+    Check your inbox and spam folder for the notification email.
+  </Step>
+
+  <Step title="Enable Debug Logging (if needed)">
+    Add `send-on-no-changes: true` to force sending an email even with no changes.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Email Not Received
+
+<AccordionGroup>
+  <Accordion title="Check Spam Folder">
+    SMTP emails may be filtered as spam. Check your spam/junk folder and mark as "Not Spam" if found.
+  </Accordion>
+
+  <Accordion title="Verify SMTP Credentials">
+    - Ensure SMTP username and password are correct
+    - For Gmail, use app-specific password, not your regular password
+    - Check that secrets are properly configured
+  </Accordion>
+
+  <Accordion title="Check Workflow Logs">
+    Look for errors in workflow logs:
+    ```
+    SMTP configured but no email-to address provided
+    Authentication failed
+    Connection timeout
+    ```
+  </Accordion>
+
+  <Accordion title="Verify Notification Threshold">
+    If no email is sent, check if the threshold was met:
+    - Use `notification-threshold: '0'` to send on every run
+    - Set `send-on-no-changes: true` for testing
+  </Accordion>
+</AccordionGroup>
+
+### Authentication Errors
+
+**Gmail "Less secure app access" error:**
+- Enable 2-Factor Authentication
+- Use App Password instead of regular password
+- Ensure "Less secure app access" is not required
+
+**Outlook authentication failed:**
+- Verify account credentials
+- Check if account has 2FA enabled (may need app password)
+- Ensure SMTP access is not disabled by organization
+
+**SendGrid authentication:**
+- Username must be the literal string `apikey`
+- Password must be a valid SendGrid API key
+- Verify API key has Mail Send permissions
+
+### Connection Issues
+
+**Port blocked:**
+- Try port `587` (STARTTLS) as default
+- Try port `465` (SSL) if 587 is blocked
+- Check if your hosting provider blocks SMTP ports
+
+**Timeout errors:**
+- Verify SMTP host address is correct
+- Check firewall/network restrictions
+- Try different SMTP port
+
+## Alternative Notification Methods
+
+If you prefer not to use built-in SMTP, integrate with external services:
+
+### Using GitHub Actions Email Action
+
+```yaml
+- name: Track stars
+  id: tracker
+  uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+- name: Send email
+  if: steps.tracker.outputs.should-notify == 'true'
+  uses: dawidd6/action-send-mail@v3
+  with:
+    server_address: smtp.gmail.com
+    server_port: 587
+    username: ${{ secrets.SMTP_USERNAME }}
+    password: ${{ secrets.SMTP_PASSWORD }}
+    subject: Star Tracker Report
+    body: ${{ steps.tracker.outputs.report-html }}
+    to: your-email@example.com
+    from: GitHub Star Tracker
+    content_type: text/html
+```
+
+### Using Slack Notifications
+
+```yaml
+- name: Track stars
+  id: tracker
+  uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+- name: Notify Slack
+  if: steps.tracker.outputs.stars-changed == 'true'
+  uses: slackapi/slack-github-action@v1
+  with:
+    payload: |
+      {
+        "text": "⭐ Star Update",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "Total: *${{ steps.tracker.outputs.total-stars }}* stars\nNew: *+${{ steps.tracker.outputs.new-stars }}*\nLost: *-${{ steps.tracker.outputs.lost-stars }}*"
+            }
+          }
+        ]
+      }
+  env:
+    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+### Using Discord Webhooks
+
+```yaml
+- name: Track stars
+  id: tracker
+  uses: fbuireu/github-star-tracker@v1
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+- name: Discord notification
+  if: steps.tracker.outputs.should-notify == 'true'
+  uses: sarisia/actions-status-discord@v1
+  with:
+    webhook: ${{ secrets.DISCORD_WEBHOOK }}
+    title: "GitHub Star Tracker Report"
+    description: |
+      **Total Stars:** ${{ steps.tracker.outputs.total-stars }}
+      **New Stars:** +${{ steps.tracker.outputs.new-stars }}
+      **Lost Stars:** -${{ steps.tracker.outputs.lost-stars }}
+    color: 0xFFAC33
+```
+
+## Related Resources
+
+- [Workflow Setup Guide](/guides/workflow-setup)
+- [Data Management](/guides/data-management)
+- [Action Outputs Reference](/api/action-outputs)

@@ -1,0 +1,180 @@
+---
+title: "Badges"
+description: "Generate SVG badges displaying your total GitHub stars"
+---
+
+## Overview
+
+GitHub Star Tracker generates SVG badges that display your total star count across all tracked repositories. These badges can be embedded in README files, documentation, or anywhere SVG images are supported.
+
+## Generating a Badge
+
+Badges are generated using the `generateBadge` function from `src/presentation/badge.ts`:
+
+```typescript
+import { generateBadge } from '@presentation/badge';
+
+const badge = generateBadge({
+  totalStars: 1337,
+  locale: 'en'
+});
+
+console.log(badge);
+// Returns SVG string
+```
+
+## Badge Design
+
+Badges follow a two-section design:
+
+<CardGroup cols={2}>
+  <Card title="Label Section" icon="tag">
+    Left section with muted background displaying "Total Stars" (localized)
+  </Card>
+  <Card title="Value Section" icon="star">
+    Right section with accent color showing ★ symbol and formatted count
+  </Card>
+</CardGroup>
+
+## Configuration
+
+Badge dimensions are configured in `src/presentation/constants.ts:57`:
+
+```typescript
+export const BADGE = {
+  labelCharWidth: 6.5,    // Width per character in label
+  valueCharWidth: 7,      // Width per character in value
+  horizontalPadding: 12,  // Padding on each side
+  height: 20,             // Badge height in pixels
+  borderRadius: 3,        // Corner radius
+} as const;
+```
+
+## Dynamic Width Calculation
+
+Badge width is calculated dynamically based on text content (see `src/presentation/badge.ts:14`):
+
+```typescript
+const labelWidth = label.length * BADGE.labelCharWidth + BADGE.horizontalPadding;
+const valueWidth = value.length * BADGE.valueCharWidth + BADGE.horizontalPadding;
+const totalWidth = labelWidth + valueWidth;
+```
+
+## Badge Structure
+
+The generated SVG includes:
+
+1. **Gradient overlay** - Subtle gradient for depth effect
+2. **Background rectangles** - Separate sections for label and value
+3. **Text with shadow** - Dual text elements for drop shadow effect
+4. **Accessibility** - Proper `role` and `aria-label` attributes
+
+## Example Output
+
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="20" role="img" aria-label="Total Stars: ★ 1.3k">
+  <title>Total Stars: ★ 1.3k</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r">
+    <rect width="120" height="20" rx="3" fill="#fff"/>
+  </clipPath>
+  <g clip-path="url(#r)">
+    <rect width="65" height="20" fill="#555"/>
+    <rect x="65" width="55" height="20" fill="#dfb317"/>
+    <rect width="120" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">
+    <text aria-hidden="true" x="32.5" y="15" fill="#010101" fill-opacity=".3">Total Stars</text>
+    <text x="32.5" y="14">Total Stars</text>
+    <text aria-hidden="true" x="92.5" y="15" fill="#010101" fill-opacity=".3">★ 1.3k</text>
+    <text x="92.5" y="14">★ 1.3k</text>
+  </g>
+</svg>
+```
+
+## Color Scheme
+
+Badges use colors from the light palette (see `src/presentation/constants.ts:3`):
+
+```typescript
+{
+  muted: '#555',      // Label background
+  accent: '#dfb317',  // Value background (gold)
+  white: '#fff',      // Text color
+  shadow: '#010101',  // Shadow color
+}
+```
+
+<Note>
+Badges do not currently support dark mode as they are typically displayed on platforms with fixed backgrounds (like GitHub).
+</Note>
+
+## Number Formatting
+
+The star count is formatted using `formatCount()` which provides human-readable numbers:
+
+- `1234` → `1.2k`
+- `5678901` → `5.7M`
+- `123` → `123`
+
+## Embedding Badges
+
+### Markdown
+
+```markdown
+![GitHub Stars](./badge.svg)
+```
+
+### HTML
+
+```html
+<img src="./badge.svg" alt="GitHub Stars">
+```
+
+### Inline in Documentation
+
+```html
+<img src="data:image/svg+xml;base64,..." alt="GitHub Stars">
+```
+
+## Localization
+
+The badge label is automatically localized based on the provided locale:
+
+```typescript
+// English
+generateBadge({ totalStars: 100, locale: 'en' });
+// Label: "Total Stars"
+
+// Spanish
+generateBadge({ totalStars: 100, locale: 'es' });
+// Label: "Estrellas Totales"
+```
+
+Translations are defined in the i18n system at `src/i18n/translations/`.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Caching" icon="clock">
+    Cache badge generation results to avoid regenerating identical badges
+  </Card>
+  <Card title="File Size" icon="file">
+    Badges are typically 1-2KB, making them lightweight for embedding
+  </Card>
+  <Card title="Accessibility" icon="universal-access">
+    Always include alt text when embedding badges in documentation
+  </Card>
+  <Card title="Updates" icon="arrows-rotate">
+    Regenerate badges whenever star counts change for accurate display
+  </Card>
+</CardGroup>
+
+## Related
+
+- [Charts](/features/charts) - More detailed visualizations
+- [Reports](/features/reports) - Comprehensive star tracking reports
+- [Formatting](/architecture) - Number formatting utilities

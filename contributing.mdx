@@ -1,0 +1,485 @@
+---
+title: Contributing
+description: How to contribute to GitHub Star Tracker development
+icon: code-pull-request
+---
+
+Thank you for considering contributing to GitHub Star Tracker! This guide will help you get started.
+
+## Ways to Contribute
+
+You don't need to be a developer to contribute! Here are various ways to help:
+
+<CardGroup cols={2}>
+  <Card title="Report Bugs" icon="bug" href="https://github.com/fbuireu/github-star-tracker/issues/new?template=bug_report.yml">
+    Found a problem? Let us know
+  </Card>
+  <Card title="Suggest Features" icon="lightbulb" href="https://github.com/fbuireu/github-star-tracker/issues/new?template=feature_request.yml">
+    Have an idea for improvement?
+  </Card>
+  <Card title="Improve Docs" icon="book" href="https://github.com/fbuireu/github-star-tracker/issues/new?template=documentation.yml">
+    Fix typos, clarify instructions
+  </Card>
+  <Card title="Write Code" icon="code" href="#development-process">
+    Submit pull requests with fixes or features
+  </Card>
+</CardGroup>
+
+## Code of Conduct
+
+This project is committed to providing a welcoming and inclusive environment. By participating, you are expected to:
+
+- **Be respectful**: Different viewpoints and experiences are valuable
+- **Be constructive**: Focus on what is best for the community
+- **Be collaborative**: Work together towards common goals
+- **Be patient**: Remember that we all have different levels of experience
+
+## Getting Started
+
+### Prerequisites
+
+Before you begin, ensure you have:
+
+- **Node.js 24+**: Required for development
+- **pnpm**: Package manager (install via `npm install -g pnpm`)
+- **Git**: For version control
+- **GitHub account**: For submitting PRs
+
+### Fork and Clone
+
+1. **Fork the repository** on GitHub
+
+2. **Clone your fork**:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/github-star-tracker.git
+   cd github-star-tracker
+   ```
+
+3. **Add upstream remote**:
+   ```bash
+   git remote add upstream https://github.com/fbuireu/github-star-tracker.git
+   ```
+
+### Install Dependencies
+
+```bash
+# Install dependencies
+pnpm install
+```
+
+## Development Process
+
+### Create a Branch
+
+Always create a new branch for your changes:
+
+```bash
+# Feature branch
+git checkout -b feature/my-awesome-feature
+
+# Bug fix branch
+git checkout -b fix/issue-123
+
+# Documentation branch
+git checkout -b docs/improve-readme
+```
+
+**Branch naming conventions:**
+- `feature/`: New features
+- `fix/`: Bug fixes
+- `docs/`: Documentation changes
+- `refactor/`: Code refactoring
+- `test/`: Test improvements
+- `chore/`: Maintenance tasks
+
+### Make Changes
+
+Edit files using your preferred editor. The project structure is:
+
+```
+src/
+├── index.ts              # Entry point
+├── application/          # Orchestration layer
+├── config/               # Configuration parsing
+├── domain/               # Business logic
+├── infrastructure/       # External services (GitHub API, Git, SMTP)
+├── presentation/         # Output generation (charts, reports)
+└── i18n/                 # Internationalization
+```
+
+<Note>
+  **Path aliases**: Use `@application/*`, `@config/*`, `@domain/*`, `@i18n`, `@infrastructure/*`, `@presentation/*` for cross-layer imports.
+</Note>
+
+### Code Style Guidelines
+
+This project uses **Biome** for linting and formatting.
+
+**Check code style:**
+```bash
+pnpm run check
+```
+
+**Auto-fix issues:**
+```bash
+pnpm run format
+```
+
+**Coding standards:**
+- TypeScript with strict mode
+- Functional programming style preferred
+- No `any` types (use `unknown` if needed)
+- Functions with 2+ parameters should use destructured named parameters
+- Constants for magic numbers/strings
+- Comprehensive JSDoc for public APIs
+
+**Example:**
+```typescript
+// ❌ Bad
+export function formatDate(d: any, fmt: string): string {
+  // ...
+}
+
+// ✅ Good
+/**
+ * Formats a date according to the specified format string.
+ * @param date - The date to format
+ * @param format - The format string (e.g., 'YYYY-MM-DD')
+ * @returns Formatted date string
+ */
+export function formatDate({ date, format }: {
+  date: Date;
+  format: string;
+}): string {
+  // ...
+}
+```
+
+### Testing
+
+All features must include tests. The project uses **Vitest**.
+
+**Run tests:**
+```bash
+pnpm run test              # Run once
+pnpm run test:watch        # Watch mode
+pnpm run test:coverage     # With coverage report
+```
+
+**Test requirements:**
+- ✅ Unit tests for all functions
+- ✅ Integration tests for complex flows
+- ✅ Minimum 80% code coverage
+- ✅ Tests must pass before merging
+
+**Example test:**
+```typescript
+import { describe, it, expect } from 'vitest';
+import { calculateStarDelta } from './delta';
+
+describe('calculateStarDelta', () => {
+  it('should calculate positive delta correctly', () => {
+    const result = calculateStarDelta({
+      current: 100,
+      previous: 80
+    });
+    
+    expect(result).toBe(20);
+  });
+  
+  it('should handle negative delta', () => {
+    const result = calculateStarDelta({
+      current: 80,
+      previous: 100
+    });
+    
+    expect(result).toBe(-20);
+  });
+});
+```
+
+### Type Checking
+
+```bash
+pnpm run typecheck
+```
+
+Ensure there are no TypeScript errors before submitting.
+
+### Build
+
+```bash
+pnpm run build
+```
+
+This compiles TypeScript and bundles the action into `dist/index.js`.
+
+### Run All Checks
+
+```bash
+pnpm run validate
+```
+
+This runs:
+1. Code style checks
+2. Type checking
+3. Unit tests with coverage
+4. Build
+
+<Warning>
+  All checks must pass before your PR can be merged.
+</Warning>
+
+## Commit Message Conventions
+
+This project uses **semantic-release** for automated versioning. **Following commit conventions is mandatory.**
+
+### Commit Format
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Commit Types
+
+| Type | Description | Version Bump | Example |
+|------|-------------|--------------|----------|
+| `feat` | New feature | Minor | `feat: add email notification support` |
+| `fix` | Bug fix | Patch | `fix: resolve chart rendering in emails` |
+| `docs` | Documentation | None | `docs: update installation guide` |
+| `style` | Code style/formatting | None | `style: fix indentation` |
+| `refactor` | Code restructuring | None | `refactor: simplify chart generation` |
+| `perf` | Performance improvement | Patch | `perf: optimize star fetching` |
+| `test` | Adding/updating tests | None | `test: add email tests` |
+| `chore` | Maintenance | None | `chore: update dependencies` |
+| `ci` | CI/CD changes | None | `ci: add release workflow` |
+| `build` | Build system | None | `build: update esbuild config` |
+
+### Breaking Changes
+
+For breaking changes, use `!` or `BREAKING CHANGE:` footer:
+
+```bash
+# Option 1: ! after type
+git commit -m "feat!: change configuration structure"
+
+# Option 2: Footer
+git commit -m "feat: redesign API
+
+BREAKING CHANGE: Config file now uses YAML instead of JSON.
+Users must migrate their configuration files."
+```
+
+**Result:** Major version bump (1.0.0 → 2.0.0)
+
+### Good Examples
+
+```bash
+feat(charts): add comparison chart for top repositories
+fix(email): resolve SMTP authentication with Gmail
+docs: add troubleshooting guide to wiki
+perf(api): reduce GitHub API calls by 50%
+test(tracking): add integration tests for star tracking
+chore(deps): update @actions/core to v1.11.1
+```
+
+### Bad Examples
+
+```bash
+update stuff                    # ❌ Not descriptive
+Fix bug                         # ❌ Doesn't follow format
+added new feature               # ❌ Wrong tense
+feat add charts                 # ❌ Missing colon
+WIP                             # ❌ Not descriptive at all
+```
+
+<Note>
+  Use imperative mood: "add" not "added" or "adds".
+</Note>
+
+### Multi-line Commits
+
+For complex changes:
+
+```bash
+git commit -m "feat(charts): add interactive charts with drill-down
+
+- Added click handlers for chart elements
+- Implemented tooltip with repository details
+- Added chart legend customization
+- Updated documentation with examples
+
+Closes #123"
+```
+
+## Pull Request Process
+
+### Before Submitting
+
+Ensure your PR meets these requirements:
+
+- ✅ All tests pass: `pnpm run validate` succeeds
+- ✅ Code is formatted: `pnpm run format`
+- ✅ Types are correct: No TypeScript errors
+- ✅ Documentation updated: If adding features
+- ✅ Commits follow conventions: See above
+- ✅ Branch is up to date: Rebase on `main` if needed
+
+### Create Pull Request
+
+1. **Push your branch**:
+   ```bash
+   git push origin feature/my-awesome-feature
+   ```
+
+2. **Open PR on GitHub**:
+   - Click "Compare & pull request"
+   - Fill in the PR template
+   - Link related issues
+
+3. **PR Title Format**:
+   Follow commit conventions:
+   ```
+   feat: add support for custom branch names
+   fix: resolve email delivery issue
+   docs: improve setup documentation
+   ```
+
+4. **Description**:
+   Include:
+   - What does this PR do?
+   - Why is this change needed?
+   - How has it been tested?
+   - Screenshots/examples if applicable
+
+### Review Process
+
+- **Maintainers will review** your PR
+- **Address feedback**: Make requested changes
+- **Keep discussions respectful**: We're all learning
+- **Be patient**: Reviews may take a few days
+
+### After Approval
+
+- PR will be **merged to main**
+- **Automated release** will trigger if applicable
+- Your contribution will be in the next version!
+
+## Testing Your Changes Locally
+
+Create a test workflow to try your changes:
+
+```yaml
+# .github/workflows/test-local.yml
+name: Test Local Changes
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: ./  # Uses local action code
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+```
+
+Commit this workflow, push, and trigger it manually from the Actions tab.
+
+## Adding Translations
+
+To add a new language:
+
+1. **Create locale file**:
+   ```bash
+   cp src/i18n/locales/en.ts src/i18n/locales/de.ts
+   ```
+
+2. **Translate strings**:
+   ```typescript
+   // src/i18n/locales/de.ts
+   export default {
+     tracking: {
+       title: 'GitHub Stern Tracker',
+       subtitle: 'Sternzahl-Änderungen'
+       // ... translate all strings
+     }
+   };
+   ```
+
+3. **Register locale**:
+   ```typescript
+   // src/i18n/index.ts
+   import de from './locales/de';
+   
+   const locales = {
+     en,
+     es,
+     ca,
+     it,
+     de  // Add your locale
+   };
+   ```
+
+4. **Update documentation**:
+   - Add language to README
+   - Update configuration examples
+
+5. **Submit PR** with the new translation
+
+## Use of AI
+
+If you use AI tools when contributing:
+
+- **Review all generated code**: You are responsible for the code you submit
+- **Test thoroughly**: AI-generated code must pass all tests
+- **Disclose significant usage**: If entire features are AI-generated, mention it in the PR
+- **Don't blindly copy**: Understand what the code does
+
+<Note>
+  AI is a tool, not a substitute for understanding the codebase.
+</Note>
+
+## Recognition
+
+Contributors are recognized in:
+
+- **Release notes** (via semantic-release)
+- **GitHub contributors** page
+- **Project README** (for significant contributions)
+
+## Questions?
+
+<CardGroup cols={2}>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/fbuireu/github-star-tracker/discussions">
+    Ask questions and get help
+  </Card>
+  <Card title="Documentation" icon="book" href="/quickstart">
+    Browse the full documentation
+  </Card>
+  <Card title="Issues" icon="circle-exclamation" href="https://github.com/fbuireu/github-star-tracker/issues">
+    Report bugs or request features
+  </Card>
+  <Card title="Security" icon="shield-halved" href="/security">
+    Report security vulnerabilities
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [Semantic Versioning](https://semver.org/)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [TypeScript Documentation](https://www.typescriptlang.org/docs/)
+- [Vitest Documentation](https://vitest.dev/)
+
+---
+
+<div style="text-align: center; margin-top: 2rem;">
+  <strong>Thank you for contributing! 🎉</strong>
+</div>

@@ -1,0 +1,212 @@
+---
+title: Action Inputs
+description: Complete reference for GitHub Star Tracker action inputs
+---
+
+## Required Inputs
+
+<ParamField path="github-token" type="string" required>
+  Personal Access Token (PAT) with `repo` or `public_repo` scope.
+  
+  **Important:** `GITHUB_TOKEN` does not work. You must use a Personal Access Token.
+  
+  ```yaml
+  - uses: ferranbuireu/github-star-tracker@v1
+    with:
+      github-token: ${{ secrets.PAT_TOKEN }}
+  ```
+</ParamField>
+
+## Optional Inputs
+
+### API Configuration
+
+<ParamField path="github-api-url" type="string" default="">
+  GitHub API base URL for GitHub Enterprise Server (e.g., `https://github.example.com/api/v3`).
+  
+  Auto-detected on GHES runners. Leave empty for github.com.
+</ParamField>
+
+<ParamField path="config-path" type="string" default="star-tracker.yml">
+  Path to the configuration file relative to repository root.
+  
+  ```yaml
+  - uses: ferranbuireu/github-star-tracker@v1
+    with:
+      config-path: .github/star-tracker.yml
+  ```
+</ParamField>
+
+### Repository Filtering
+
+<ParamField path="visibility" type="string" default="">
+  Repository visibility filter. Overrides config file.
+  
+  **Options:**
+  - `public` - Only public repositories
+  - `private` - Only private repositories
+  - `all` - All repositories
+  - `owned` - Only repositories you own
+</ParamField>
+
+<ParamField path="include-archived" type="boolean" default="">
+  Include archived repositories. Overrides config file.
+  
+  Set to `true` or `false`. Empty string uses config file value.
+</ParamField>
+
+<ParamField path="include-forks" type="boolean" default="">
+  Include forked repositories. Overrides config file.
+  
+  Set to `true` or `false`. Empty string uses config file value.
+</ParamField>
+
+<ParamField path="exclude-repos" type="string" default="">
+  Comma-separated list of repository names or regex patterns to exclude. Overrides config file.
+  
+  ```yaml
+  exclude-repos: 'repo1,repo2,/^test-.*/'
+  ```
+  
+  Supports regex patterns using `/pattern/` syntax.
+</ParamField>
+
+<ParamField path="only-repos" type="string" default="">
+  Comma-separated list of repository names to exclusively track. Overrides config file.
+  
+  When set, only these repositories will be tracked.
+  
+  ```yaml
+  only-repos: 'my-org/repo1,my-org/repo2'
+  ```
+</ParamField>
+
+<ParamField path="min-stars" type="number" default="">
+  Only track repositories with at least this many stars. Overrides config file.
+  
+  ```yaml
+  min-stars: '10'
+  ```
+</ParamField>
+
+### Data Storage
+
+<ParamField path="data-branch" type="string" default="star-tracker-data">
+  Branch name for storing tracking data, reports, charts, and history.
+  
+  The action will create this branch automatically if it doesn't exist.
+</ParamField>
+
+<ParamField path="max-history" type="number" default="52">
+  Maximum number of snapshots to keep in history.
+  
+  Older snapshots are automatically removed. Default of 52 keeps approximately one year of weekly snapshots.
+</ParamField>
+
+### Email Notifications
+
+<ParamField path="smtp-host" type="string" default="">
+  SMTP server host for email notifications.
+  
+  Providing this value enables built-in email notifications.
+  
+  ```yaml
+  smtp-host: 'smtp.gmail.com'
+  ```
+</ParamField>
+
+<ParamField path="smtp-port" type="number" default="587">
+  SMTP server port.
+  
+  Common values:
+  - `587` - TLS/STARTTLS (recommended)
+  - `465` - SSL
+  - `25` - Unencrypted (not recommended)
+</ParamField>
+
+<ParamField path="smtp-username" type="string" default="">
+  SMTP authentication username.
+  
+  ```yaml
+  smtp-username: ${{ secrets.SMTP_USERNAME }}
+  ```
+</ParamField>
+
+<ParamField path="smtp-password" type="string" default="">
+  SMTP authentication password.
+  
+  ```yaml
+  smtp-password: ${{ secrets.SMTP_PASSWORD }}
+  ```
+</ParamField>
+
+<ParamField path="email-to" type="string" default="">
+  Email recipient address.
+  
+  ```yaml
+  email-to: 'you@example.com'
+  ```
+</ParamField>
+
+<ParamField path="email-from" type="string" default="GitHub Star Tracker">
+  Email sender name or address.
+  
+  ```yaml
+  email-from: 'Star Tracker <noreply@example.com>'
+  ```
+</ParamField>
+
+<ParamField path="send-on-no-changes" type="boolean" default="false">
+  Send email even when no star changes are detected.
+  
+  Set to `true` to receive emails on every run, or `false` to only receive emails when changes occur.
+</ParamField>
+
+<ParamField path="notification-threshold" type="string" default="0">
+  Star change threshold before sending notification.
+  
+  **Options:**
+  - `0` - Send notification on every run with changes
+  - `<number>` - Send only when total star delta reaches this number (e.g., `5`)
+  - `auto` - Adaptive threshold based on total star count
+  
+  ```yaml
+  notification-threshold: 'auto'
+  ```
+</ParamField>
+
+### Report Customization
+
+<ParamField path="include-charts" type="boolean" default="true">
+  Include star trend charts in reports.
+  
+  Set to `false` to disable chart generation and reduce processing time.
+</ParamField>
+
+<ParamField path="locale" type="string" default="en">
+  Language for reports and emails.
+  
+  **Supported languages:**
+  - `en` - English
+  - `es` - Spanish
+  - `ca` - Catalan
+  - `it` - Italian
+</ParamField>
+
+<ParamField path="top-repos" type="number" default="10">
+  Number of top repositories to feature in charts and forecasts.
+  
+  Repositories are ranked by star count. Charts are generated for the top N repositories.
+</ParamField>
+
+### Advanced Features
+
+<ParamField path="track-stargazers" type="boolean" default="false">
+  Track individual stargazers and show new ones in reports.
+  
+  **Warning:** Enabling this feature significantly increases API usage and execution time for repositories with many stars.
+  
+  ```yaml
+  track-stargazers: 'true'
+  ```
+</ParamField>

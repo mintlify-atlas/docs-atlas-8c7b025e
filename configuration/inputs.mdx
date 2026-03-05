@@ -1,0 +1,360 @@
+---
+title: Action Inputs
+description: Complete reference for all GitHub Star Tracker action inputs
+---
+
+This page documents all available action inputs for GitHub Star Tracker. You can configure these in your workflow's `with:` section.
+
+## Required Inputs
+
+<ParamField path="github-token" type="string" required>
+  Personal Access Token (PAT) with `repo` or `public_repo` scope.
+  
+  **Important:** The default `GITHUB_TOKEN` does not work because it cannot push to protected branches or access all repositories.
+  
+  ```yaml
+  with:
+    github-token: ${{ secrets.PAT_TOKEN }}
+  ```
+  
+  <Tip>
+    Store your PAT as a repository secret and never commit it directly to your code.
+  </Tip>
+</ParamField>
+
+## GitHub Configuration
+
+<ParamField path="github-api-url" type="string" default="">
+  GitHub API base URL for GitHub Enterprise Server (e.g., `https://github.example.com/api/v3`).
+  
+  Auto-detected on GHES runners. Only needed if you're using GitHub Enterprise Server.
+  
+  ```yaml
+  with:
+    github-api-url: https://github.example.com/api/v3
+  ```
+</ParamField>
+
+<ParamField path="config-path" type="string" default="star-tracker.yml">
+  Path to the configuration file (relative to repository root).
+  
+  ```yaml
+  with:
+    config-path: .github/star-tracker.yml
+  ```
+</ParamField>
+
+## Repository Filtering
+
+These inputs override corresponding values in the configuration file.
+
+<ParamField path="visibility" type="string" default="all">
+  Repository visibility filter. Available options:
+  
+  - `public` - Only public repositories
+  - `private` - Only private repositories
+  - `all` - Both public and private repositories
+  - `owned` - Only repositories you own (excludes organization repos where you're a member)
+  
+  ```yaml
+  with:
+    visibility: public
+  ```
+</ParamField>
+
+<ParamField path="include-archived" type="boolean" default="false">
+  Include archived repositories in tracking.
+  
+  ```yaml
+  with:
+    include-archived: true
+  ```
+</ParamField>
+
+<ParamField path="include-forks" type="boolean" default="false">
+  Include forked repositories in tracking.
+  
+  ```yaml
+  with:
+    include-forks: true
+  ```
+</ParamField>
+
+<ParamField path="exclude-repos" type="string" default="">
+  Comma-separated list of repository names or regex patterns to exclude.
+  
+  Regular expressions must be wrapped in forward slashes with optional flags: `/pattern/flags`
+  
+  ```yaml
+  with:
+    exclude-repos: old-repo, /^test-.*/, /^draft/i
+  ```
+  
+  Examples:
+  - `old-repo` - Exact match
+  - `/^test-.*/` - Repos starting with "test-"
+  - `/draft/i` - Repos containing "draft" (case-insensitive)
+</ParamField>
+
+<ParamField path="only-repos" type="string" default="">
+  Comma-separated list of repository names to exclusively track.
+  
+  When set, only these repositories will be tracked (ignoring all other filters).
+  
+  ```yaml
+  with:
+    only-repos: my-main-repo, my-other-repo
+  ```
+  
+  <Warning>
+    When `only-repos` is set, all other filtering options (visibility, include-archived, etc.) are ignored.
+  </Warning>
+</ParamField>
+
+<ParamField path="min-stars" type="number" default="0">
+  Only track repositories with at least this many stars.
+  
+  ```yaml
+  with:
+    min-stars: 5
+  ```
+</ParamField>
+
+## Data Storage
+
+<ParamField path="data-branch" type="string" default="star-tracker-data">
+  Branch name for storing tracking data and historical snapshots.
+  
+  ```yaml
+  with:
+    data-branch: star-tracker-data
+  ```
+  
+  <Info>
+    This branch is automatically created and managed by the action.
+  </Info>
+</ParamField>
+
+<ParamField path="max-history" type="number" default="52">
+  Maximum number of snapshots to keep in history.
+  
+  Older snapshots are automatically removed. Default is 52 (one year of weekly runs).
+  
+  ```yaml
+  with:
+    max-history: 100
+  ```
+</ParamField>
+
+## Reports and Charts
+
+<ParamField path="include-charts" type="boolean" default="true">
+  Include SVG charts in reports.
+  
+  Charts include:
+  - Star history timeline
+  - Repository comparison
+  - Growth forecast
+  - Individual repository trends
+  
+  ```yaml
+  with:
+    include-charts: false
+  ```
+</ParamField>
+
+<ParamField path="locale" type="string" default="en">
+  Language for reports and emails.
+  
+  Available locales:
+  - `en` - English (English)
+  - `es` - Spanish (Español)
+  - `ca` - Catalan (Català)
+  - `it` - Italian (Italiano)
+  
+  ```yaml
+  with:
+    locale: es
+  ```
+</ParamField>
+
+<ParamField path="top-repos" type="number" default="10">
+  Number of top repositories to feature in charts and forecasts (ranked by star count).
+  
+  ```yaml
+  with:
+    top-repos: 15
+  ```
+</ParamField>
+
+<ParamField path="track-stargazers" type="boolean" default="false">
+  Track individual stargazers and show new ones in reports.
+  
+  When enabled, the action will:
+  - Track who stars your repositories
+  - Show new stargazers since the last run
+  - Include stargazer information in reports
+  
+  ```yaml
+  with:
+    track-stargazers: true
+  ```
+  
+  <Warning>
+    Tracking stargazers increases API calls and may take longer for repositories with many stars.
+  </Warning>
+</ParamField>
+
+## Email Notifications
+
+<ParamField path="smtp-host" type="string" default="">
+  SMTP server host. Providing this enables built-in email notifications.
+  
+  ```yaml
+  with:
+    smtp-host: smtp.gmail.com
+  ```
+</ParamField>
+
+<ParamField path="smtp-port" type="number" default="587">
+  SMTP server port.
+  
+  Common ports:
+  - `587` - TLS/STARTTLS (recommended)
+  - `465` - SSL
+  - `25` - Unencrypted (not recommended)
+  
+  ```yaml
+  with:
+    smtp-port: 587
+  ```
+</ParamField>
+
+<ParamField path="smtp-username" type="string" default="">
+  SMTP authentication username.
+  
+  ```yaml
+  with:
+    smtp-username: ${{ secrets.SMTP_USERNAME }}
+  ```
+</ParamField>
+
+<ParamField path="smtp-password" type="string" default="">
+  SMTP authentication password.
+  
+  ```yaml
+  with:
+    smtp-password: ${{ secrets.SMTP_PASSWORD }}
+  ```
+  
+  <Tip>
+    Always store SMTP credentials as GitHub secrets.
+  </Tip>
+</ParamField>
+
+<ParamField path="email-to" type="string" default="">
+  Email recipient address.
+  
+  ```yaml
+  with:
+    email-to: [email protected]
+  ```
+</ParamField>
+
+<ParamField path="email-from" type="string" default="GitHub Star Tracker">
+  Email sender name or address.
+  
+  ```yaml
+  with:
+    email-from: Star Tracker <[email protected]>
+  ```
+</ParamField>
+
+<ParamField path="send-on-no-changes" type="boolean" default="false">
+  Send email even when no star changes are detected.
+  
+  ```yaml
+  with:
+    send-on-no-changes: true
+  ```
+</ParamField>
+
+<ParamField path="notification-threshold" type="string" default="auto">
+  Star change threshold before sending notification.
+  
+  Options:
+  - `0` - Send on every run (regardless of changes)
+  - `<number>` - Send when stars change by at least this amount (e.g., `5`)
+  - `auto` - Adaptive threshold based on total stars and history
+  
+  ```yaml
+  with:
+    notification-threshold: 5
+  ```
+  
+  <Info>
+    The `auto` mode intelligently adjusts the threshold based on your repository activity patterns.
+  </Info>
+</ParamField>
+
+## Complete Example
+
+Here's a workflow with all commonly used inputs:
+
+```yaml .github/workflows/star-tracker.yml
+name: Track GitHub Stars
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight
+  workflow_dispatch:
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Track stars
+        uses: ferranbuireu/github-star-tracker@v2
+        with:
+          # Required
+          github-token: ${{ secrets.PAT_TOKEN }}
+          
+          # Repository filtering
+          visibility: public
+          include-archived: false
+          include-forks: false
+          min-stars: 5
+          
+          # Data storage
+          data-branch: star-tracker-data
+          max-history: 52
+          
+          # Reports
+          include-charts: true
+          locale: en
+          top-repos: 10
+          track-stargazers: true
+          
+          # Email notifications
+          smtp-host: smtp.gmail.com
+          smtp-port: 587
+          smtp-username: ${{ secrets.SMTP_USERNAME }}
+          smtp-password: ${{ secrets.SMTP_PASSWORD }}
+          email-to: [email protected]
+          email-from: Star Tracker
+          notification-threshold: auto
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Filtering" icon="filter" href="/configuration/filtering">
+    Learn advanced repository filtering techniques
+  </Card>
+  <Card title="Notifications" icon="bell" href="/configuration/notifications">
+    Configure email notifications and thresholds
+  </Card>
+</CardGroup>

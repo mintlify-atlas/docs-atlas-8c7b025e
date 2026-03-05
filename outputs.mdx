@@ -1,0 +1,498 @@
+---
+title: Action Outputs
+description: Complete reference for all GitHub Star Tracker action outputs and how to use them in workflows
+---
+
+GitHub Star Tracker exports multiple outputs that you can use to chain workflows, trigger notifications, or integrate with other actions.
+
+## Output Reference
+
+All outputs are set using the `@actions/core` library in `src/application/tracker.ts:254`:
+
+```typescript
+function setOutputs({
+  summary,
+  markdownReport,
+  htmlReport,
+  csvReport,
+  shouldNotify,
+  newStargazers,
+}: SetOutputsParams): void {
+  core.setOutput('report', markdownReport);
+  core.setOutput('report-html', htmlReport);
+  core.setOutput('report-csv', csvReport);
+  core.setOutput('total-stars', String(summary.totalStars));
+  core.setOutput('stars-changed', String(summary.changed));
+  core.setOutput('new-stars', String(summary.newStars));
+  core.setOutput('lost-stars', String(summary.lostStars));
+  core.setOutput('should-notify', String(shouldNotify));
+  core.setOutput('new-stargazers', String(newStargazers));
+}
+```
+
+### Numeric Outputs
+
+<AccordionGroup>
+  <Accordion title="total-stars">
+    **Type**: `string` (numeric value)
+
+    **Description**: Total star count across all tracked repositories.
+
+    **Source**: Computed from `Summary.totalStars` (see `src/domain/types.ts:41`):
+
+    ```typescript
+    interface Summary {
+      totalStars: number;    // Sum of stars from all non-removed repos
+      totalPrevious: number;
+      totalDelta: number;
+      newStars: number;
+      lostStars: number;
+      changed: boolean;
+    }
+    ```
+
+    **Example**:
+    ```yaml
+    - name: Display total stars
+      run: echo "Total stars: ${{ steps.tracker.outputs.total-stars }}"
+    ```
+
+    **Edge Cases**:
+    - Returns `"0"` if no repositories match filters
+    - Excludes removed repositories from the count
+  </Accordion>
+
+  <Accordion title="new-stars">
+    **Type**: `string` (numeric value)
+
+    **Description**: Total stars gained since the last run.
+
+    **Source**: `Summary.newStars` - sum of positive deltas from `src/domain/comparison.ts:65`:
+
+    ```typescript
+    const gained = repoResults
+      .filter((repo) => repo.delta > 0)
+      .reduce((sum, repo) => sum + repo.delta, 0);
+    ```
+
+    **Example**:
+    ```yaml
+    - name: Celebrate new stars
+      if: steps.tracker.outputs.new-stars > '0'
+      run: echo "Gained ${{ steps.tracker.outputs.new-stars }} new stars!"
+    ```
+  </Accordion>
+
+  <Accordion title="lost-stars">
+    **Type**: `string` (numeric value)
+
+    **Description**: Total stars lost since the last run.
+
+    **Source**: `Summary.lostStars` - sum of negative deltas (absolute value) from `src/domain/comparison.ts:69`:
+
+    ```typescript
+    const lost = repoResults
+      .filter((repo) => repo.delta < 0)
+      .reduce((sum, repo) => sum + Math.abs(repo.delta), 0);
+    ```
+
+    **Example**:
+    ```yaml
+    - name: Alert on star loss
+      if: steps.tracker.outputs.lost-stars > '10'
+      run: echo "Lost ${{ steps.tracker.outputs.lost-stars }} stars"
+    ```
+
+    <Note>
+      Stars can be lost due to:
+      - Users unstarring repositories
+      - Repositories being deleted
+      - Repositories no longer matching filters
+    </Note>
+  </Accordion>
+
+  <Accordion title="new-stargazers">
+    **Type**: `string` (numeric value)
+
+    **Description**: Number of new individual stargazers (requires `track-stargazers: true`).
+
+    **Source**: `StargazerDiffResult.totalNew` from `src/domain/stargazers.ts:30`:
+
+    ```typescript
+    export function diffStargazers({
+      current,
+      previousMap,
+    }: DiffStargazersParams): StargazerDiffResult {
+      let totalNew = 0;
+      for (const repo of current) {
+        const previousLogins = new Set(previousMap[repo.repoFullName] ?? []);
+        const newStargazers = repo.stargazers.filter((s) => !previousLogins.has(s.login));
+        totalNew += newStargazers.length;
+      }
+      return { entries, totalNew };
+    }
+    ```
+
+    **Example**:
+    ```yaml
+    - name: Thank new stargazers
+      if: steps.tracker.outputs.new-stargazers > '0'
+      run: |
+        echo "Welcome to ${{ steps.tracker.outputs.new-stargazers }} new stargazers!"
+    ```
+
+    **Default**: `"0"` if `track-stargazers: false`
+  </Accordion>
+</AccordionGroup>
+
+### Boolean Outputs
+
+<AccordionGroup>
+  <Accordion title="stars-changed">
+    **Type**: `string` (`"true"` or `"false"`)
+
+    **Description**: Whether any star count changes occurred.
+
+    **Source**: `Summary.changed` from `src/domain/comparison.ts:73`:
+
+    ```typescript
+    const changed = repoResults.some((repo) => repo.delta !== 0 || repo.isNew || repo.isRemoved);
+    ```
+
+    Returns `true` if:
+    - Any repository gained or lost stars
+    - New repositories were added (matching filters)
+    - Repositories were removed (no longer matching filters or deleted)
+
+    **Example**:
+    ```yaml
+    - name: Post update
+      if: steps.tracker.outputs.stars-changed == 'true'
+      run: |
+        curl -X POST https://api.example.com/webhook \
+          -d '{"stars": ${{ steps.tracker.outputs.total-stars }}}'
+    ```
+
+    <Info>
+      Use this output to conditionally trigger downstream actions only when changes occur.
+    </Info>
+  </Accordion>
+
+  <Accordion title="should-notify">
+    **Type**: `string` (`"true"` or `"false"`)
+
+    **Description**: Whether the notification threshold was reached.
+
+    **Source**: Computed in `src/application/tracker.ts:128` using `shouldNotify()` from `src/domain/notification.ts`:
+
+    ```typescript
+    const thresholdReached = shouldNotify({
+      totalStars: summary.totalStars,
+      starsAtLastNotification: history.starsAtLastNotification,
+      threshold: config.notificationThreshold,
+    });
+    const notify = summary.changed && thresholdReached;
+    ```
+
+    **Threshold Logic**:
+    - `notification-threshold: 0` → Always `true` if stars changed
+    - `notification-threshold: N` → `true` if delta >= N since last notification
+    - `notification-threshold: auto` → Adaptive percentage-based thresholds:
+      - < 1,000 stars: 1% change
+      - 1,000 - 10,000 stars: 0.5% change
+      - \> 10,000 stars: 0.1% change
+
+    **Example**:
+    ```yaml
+    - name: Send custom notification
+      if: steps.tracker.outputs.should-notify == 'true'
+      uses: some/notification-action@v1
+      with:
+        message: "Star count changed!"
+    ```
+
+    <Note>
+      The action's built-in email notification uses this same logic. This output allows you to trigger custom notifications.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+### Report Outputs
+
+<AccordionGroup>
+  <Accordion title="report">
+    **Type**: `string` (Markdown format)
+
+    **Description**: Complete Markdown report with summary, tables, and embedded chart links.
+
+    **Source**: Generated by `generateMarkdownReport()` in `src/presentation/markdown.ts`.
+
+    **Contents**:
+    - Summary section with total stars and delta
+    - Table of all repositories with current/previous/delta columns
+    - New and removed repositories sections
+    - Stargazer details (if enabled)
+    - Growth forecast tables (if available)
+    - Embedded SVG chart images from data branch
+
+    **Example**:
+    ```yaml
+    - name: Create issue with report
+      if: steps.tracker.outputs.stars-changed == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: 'Weekly Star Report',
+            body: `${{ steps.tracker.outputs.report }}`
+          });
+    ```
+
+    **Format**: GitHub-flavored Markdown with tables, emoji, and image embeds.
+  </Accordion>
+
+  <Accordion title="report-html">
+    **Type**: `string` (HTML format)
+
+    **Description**: HTML version of the report with inline styles for email compatibility.
+
+    **Source**: Generated by `generateHtmlReport()` in `src/presentation/html.ts`.
+
+    **Contents**: Same data as Markdown report but formatted as HTML with:
+    - Inline CSS (no external stylesheets)
+    - Responsive tables
+    - Color-coded delta indicators
+    - Email client compatibility
+
+    **Example**:
+    ```yaml
+    - name: Post to Slack with HTML
+      if: steps.tracker.outputs.stars-changed == 'true'
+      run: |
+        curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+          -H 'Content-Type: application/json' \
+          -d '{"html": "${{ steps.tracker.outputs.report-html }}"}'
+    ```
+
+    <Info>
+      This output is used by the built-in email notification feature.
+    </Info>
+  </Accordion>
+
+  <Accordion title="report-csv">
+    **Type**: `string` (CSV format)
+
+    **Description**: Machine-readable CSV export for data pipelines and spreadsheets.
+
+    **Source**: Generated by `generateCsvReport()` in `src/presentation/csv.ts`.
+
+    **Format**:
+    ```csv
+    Repository,Stars,Previous,Delta,Status
+    owner/repo-1,245,230,+15,Changed
+    owner/repo-2,150,0,+150,New
+    owner/repo-3,100,100,0,Unchanged
+    owner/repo-4,0,50,-50,Removed
+    ```
+
+    **Columns**:
+    - `Repository`: Full repository name (owner/repo)
+    - `Stars`: Current star count
+    - `Previous`: Previous star count (or 0 for new repos)
+    - `Delta`: Change (+/- or 0)
+    - `Status`: `New`, `Removed`, `Changed`, or `Unchanged`
+
+    **Example**:
+    ```yaml
+    - name: Upload to Google Sheets
+      if: steps.tracker.outputs.stars-changed == 'true'
+      run: |
+        echo '${{ steps.tracker.outputs.report-csv }}' > stars.csv
+        python upload_to_sheets.py stars.csv
+    ```
+
+    **Example: Save to artifact**
+    ```yaml
+    - name: Save CSV report
+      uses: actions/upload-artifact@v4
+      with:
+        name: star-report
+        path: stars.csv
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Usage Patterns
+
+### Conditional Workflow Steps
+
+Trigger steps only when specific conditions are met:
+
+```yaml
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fbuireu/github-star-tracker@v1
+        id: tracker
+        with:
+          github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+      - name: Celebrate milestones
+        if: steps.tracker.outputs.total-stars >= '1000'
+        run: echo "🎉 Reached 1,000 stars!"
+
+      - name: Alert on significant loss
+        if: steps.tracker.outputs.lost-stars >= '50'
+        run: |
+          echo "⚠️ Lost ${{ steps.tracker.outputs.lost-stars }} stars"
+          # Trigger incident response
+```
+
+### Chaining with Other Actions
+
+Pass outputs to subsequent actions:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  id: tracker
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+- name: Update status page
+  if: steps.tracker.outputs.stars-changed == 'true'
+  uses: some/status-action@v1
+  with:
+    metric: stars
+    value: ${{ steps.tracker.outputs.total-stars }}
+    change: ${{ steps.tracker.outputs.new-stars }}
+
+- name: Post to Discord
+  if: steps.tracker.outputs.should-notify == 'true'
+  uses: sarisia/actions-status-discord@v1
+  with:
+    webhook: ${{ secrets.DISCORD_WEBHOOK }}
+    description: |
+      **Star Update**
+      Total: ${{ steps.tracker.outputs.total-stars }}
+      New: +${{ steps.tracker.outputs.new-stars }}
+      Lost: -${{ steps.tracker.outputs.lost-stars }}
+```
+
+### Creating Issues
+
+Automatically create GitHub issues with reports:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  id: tracker
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+- name: Create weekly report issue
+  if: steps.tracker.outputs.stars-changed == 'true'
+  uses: actions/github-script@v7
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    script: |
+      const title = `Star Report - ${new Date().toLocaleDateString()}`;
+      const body = `${{ steps.tracker.outputs.report }}`;
+      
+      await github.rest.issues.create({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        title: title,
+        body: body,
+        labels: ['star-tracker', 'report']
+      });
+```
+
+### Custom Notifications
+
+Implement custom notification logic:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  id: tracker
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+    notification-threshold: auto
+
+- name: Send Telegram notification
+  if: steps.tracker.outputs.should-notify == 'true'
+  run: |
+    curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+      -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+      -d "text=⭐ Star count: ${{ steps.tracker.outputs.total-stars }} (+${{ steps.tracker.outputs.new-stars }})"
+```
+
+### Data Pipeline Integration
+
+Export data to external systems:
+
+```yaml
+- uses: fbuireu/github-star-tracker@v1
+  id: tracker
+  with:
+    github-token: ${{ secrets.GITHUB_STAR_TRACKER_TOKEN }}
+
+- name: Upload to S3
+  if: steps.tracker.outputs.stars-changed == 'true'
+  run: |
+    echo '${{ steps.tracker.outputs.report-csv }}' > stars.csv
+    aws s3 cp stars.csv s3://my-bucket/star-history/$(date +%Y-%m-%d).csv
+
+- name: Post to analytics API
+  if: steps.tracker.outputs.stars-changed == 'true'
+  run: |
+    curl -X POST https://analytics.example.com/api/metrics \
+      -H "Authorization: Bearer ${{ secrets.ANALYTICS_TOKEN }}" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "metric": "github_stars",
+        "value": ${{ steps.tracker.outputs.total-stars }},
+        "tags": {
+          "new": ${{ steps.tracker.outputs.new-stars }},
+          "lost": ${{ steps.tracker.outputs.lost-stars }}
+        }
+      }'
+```
+
+## Empty Outputs
+
+If no repositories match the configured filters, all outputs are set to empty/zero values:
+
+```typescript
+function setEmptyOutputs(): void {
+  core.setOutput('total-stars', '0');
+  core.setOutput('stars-changed', 'false');
+  core.setOutput('new-stars', '0');
+  core.setOutput('lost-stars', '0');
+  core.setOutput('should-notify', 'false');
+  core.setOutput('new-stargazers', '0');
+  core.setOutput('report', 'No repositories matched the configured filters.');
+  core.setOutput('report-html', '<p>No repositories matched the configured filters.</p>');
+  core.setOutput('report-csv', '');
+}
+```
+
+From `src/application/tracker.ts:233`.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Configure tracking options and notification thresholds
+  </Card>
+  <Card title="Email Notifications" icon="envelope" href="/guides/email-notifications">
+    Set up built-in SMTP notifications
+  </Card>
+  <Card title="Examples" icon="code" href="/examples">
+    See real-world workflow examples
+  </Card>
+  <Card title="How It Works" icon="gears" href="/how-it-works">
+    Understand the complete execution pipeline
+  </Card>
+</CardGroup>
