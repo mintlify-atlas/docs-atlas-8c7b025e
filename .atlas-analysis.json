@@ -1,0 +1,145 @@
+{
+  "projectType": "infrastructure",
+  "projectName": "GitHub Star Tracker",
+  "projectDescription": "A GitHub Action that automatically tracks star count changes across repositories with visual charts, email notifications, and historical reports",
+  "theme": "aspen",
+  "primaryColor": "#848c8e",
+  "lightColor": "#11161e",
+  "darkColor": "#cfd0d2",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "how-it-works",
+              "architecture",
+              "outputs"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/inputs",
+              "configuration/filtering",
+              "configuration/notifications",
+              "configuration/localization"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/charts",
+              "features/badges",
+              "features/stargazer-tracking",
+              "features/forecasting",
+              "features/reports"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/personal-access-token",
+              "guides/workflow-setup",
+              "guides/email-notifications",
+              "guides/embedding-charts",
+              "guides/data-management",
+              "guides/github-enterprise"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Action Reference",
+            "pages": [
+              "api/action-inputs",
+              "api/action-outputs",
+              "api/data-formats"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Help",
+            "pages": [
+              "troubleshooting",
+              "faq",
+              "examples",
+              "limitations"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "contributing",
+              "security"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Animated SVG charts with dark/light mode support",
+    "Historical snapshots with configurable retention",
+    "Smart repository filtering by visibility, ownership, and stars",
+    "Stargazer tracking with avatars and timestamps",
+    "Email notifications with SMTP and adaptive thresholds",
+    "Multi-language support (English, Spanish, Catalan, Italian)",
+    "CSV, JSON, Markdown, and HTML report generation",
+    "Shields.io-style badges",
+    "Growth forecasting",
+    "GitHub Enterprise Server support"
+  ],
+  "publicApiSurface": [
+    "github-token (input)",
+    "github-api-url (input)",
+    "config-path (input)",
+    "visibility (input)",
+    "include-archived (input)",
+    "include-forks (input)",
+    "exclude-repos (input)",
+    "only-repos (input)",
+    "min-stars (input)",
+    "data-branch (input)",
+    "max-history (input)",
+    "smtp-host (input)",
+    "smtp-port (input)",
+    "smtp-username (input)",
+    "smtp-password (input)",
+    "email-to (input)",
+    "email-from (input)",
+    "send-on-no-changes (input)",
+    "include-charts (input)",
+    "notification-threshold (input)",
+    "locale (input)",
+    "top-repos (input)",
+    "track-stargazers (input)",
+    "report (output)",
+    "report-html (output)",
+    "total-stars (output)",
+    "stars-changed (output)",
+    "new-stars (output)",
+    "lost-stars (output)",
+    "should-notify (output)",
+    "report-csv (output)",
+    "new-stargazers (output)"
+  ]
+}
